@@ -1,8 +1,16 @@
+import { promises } from "dns";
 import { getDB } from "../DB/Connection"    
 
+//#region CRUD for user table
 export async function createUser(user:any) {
     try{
         const db = await getDB();
+        const existingPhone = await db.get(`SELECT * FROM User WHERE phone = ?`, [user.phone]);
+
+        if(existingPhone){
+            console.error(`The Phone number already existis`)
+            return
+        }
         const query = `INSERT INTO User
                        (name, email, password, phone, alternative_phone, country, role_id) 
                        VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -21,6 +29,7 @@ export async function createUser(user:any) {
         console.error('Cant create the user, please try again', error.message);
     }
 }
+
 createUser({
     name: "Juan",
     email: "juan@example.com",
