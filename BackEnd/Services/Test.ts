@@ -1,7 +1,14 @@
-import { deleteUserByID } from "./CRUD";
+import { createStatus } from "./CRUD";
 
 async function main() {
-    await deleteUserByID(3);
+    await createStatus({
+        payment_made: true,
+        current_student: false,
+        current_worker: true,
+        active_candidate: false,
+        applied: false,
+        open_offer: true
+    });
 }
 
 main();

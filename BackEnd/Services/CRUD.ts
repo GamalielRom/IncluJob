@@ -29,17 +29,6 @@ export async function createUser(user:any) {
         console.error('Cant create the user, please try again', error.message);
     }
 }
-/*
-createUser({
-    name: "Juan",
-    email: "juan@example.com",
-    password: "securepassword",
-    phone: 123456789,
-    alternative_phone: 987654321,
-    country: "Canada",
-    role_id: 1
-});
- */
 export async function getAllUsers() {
     try{
         const db = await getDB();
@@ -67,7 +56,7 @@ export async function getUserByID(id:number) {
                         GROUP BY  r.role_name`;
         const user = await db.get(query, [id]);
         if(!user){
-            console.error(`❌ No user found with id ${id}`);
+            console.error(`No user found with id ${id}`);
             return null;
         }
         return user;
@@ -129,3 +118,25 @@ export async function deleteUserByID(id:number): Promise<void> {
     }
 }
 //#endregion 
+
+
+//#region CRUD for Status table
+//Create a Status
+export async function createStatus(status: any) 
+         {
+             try{
+                 const db = await getDB();
+                 const query = `
+                     INSERT INTO Status
+                     (payment_made, current_student, current_worker, active_candidate,applied,open_offer)
+                     VALUES (?, ?, ?, ?, ?, ?);
+                 `;
+                 const values = Object.values(status)
+                 await db.run(query, values);
+                 console.log('Status added successfully');
+             }catch(error){
+                 console.error('Cant add this status please try again', (error as Error).message);
+             }
+         };
+
+//#endregion
