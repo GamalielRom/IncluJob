@@ -30,3 +30,25 @@ createUser({
     country: "Canada",
     role_id: 1
 });
+
+
+//#region CRUD for Status table
+//Create a Status
+export async function createStatus(status: any) 
+         {
+             try{
+                 const db = await getDB();
+                 const query = `
+                     INSERT INTO Status
+                     (payment_made, current_student, current_worker, active_candidate,applied,open_offer)
+                     VALUES (?, ?, ?, ?, ?, ?);
+                 `;
+                 const values = Object.values(status)
+                 await db.run(query, values);
+                 console.log('Status added successfully');
+             }catch(error){
+                 console.error('Cant add this status please try again', (error as Error).message);
+             }
+         };
+
+//#endregion

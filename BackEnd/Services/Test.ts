@@ -1,14 +1,13 @@
-import { createUser } from "./CRUD";
+import { createStatus } from "./CRUD";
 
 async function main() {
-    await createUser({
-        name: "Gama",
-        email: "Gama@example.com",
-        password: "securepassword",
-        phone: 123456789,
-        alternative_phone: 987654321,
-        country: "Canada",
-        role_id: 1
+    await createStatus({
+        payment_made: true,
+        current_student: false,
+        current_worker: true,
+        active_candidate: false,
+        applied: false,
+        open_offer: true
     });
 }
 
