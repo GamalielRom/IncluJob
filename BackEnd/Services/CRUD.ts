@@ -138,7 +138,32 @@ export async function createStatus(status: any)
                  console.error('Cant add this status please try again', (error as Error).message);
              }
          };
-
+export async function getAllStatus() {
+            try{
+                const db = await getDB();
+                const query = `SELECT * FROM Status `;
+                const status = await db.all(query);
+                return status;        
+            }catch(error){
+                console.error(`Cant fetch the statuses`, error.message);
+            }
+        }
+export async function getStatusByID(id:number) {
+            try{
+                const db = await getDB();
+                const query = `SELECT s.*
+                                FROM Status s 
+                                WHERE s.id = ?`;
+                const status = await db.get(query, [id]);
+                if(!status){
+                    console.error(`No status found with id ${id}`);
+                    return null;
+                }
+                return status;
+            }catch(error){
+                console.error(`Cant find status with id ${id}`, error.message);
+            }
+        }
 //#endregion
 
 //#region CRUD for Role Table
