@@ -172,6 +172,7 @@ export async function getRoleByID(id:number) {
 //#endregion
 
 //#region CRUD for Candidates table
+
 export async function createCandidate(candidate:any) {
     try{
         const db = await getDB();
@@ -302,5 +303,27 @@ export async function deleteCandidateByID(id:number): Promise<void> {
     console.error(`Error deleting the Candidate`, (error as Error).message);
     throw Error;
 }
+}
+//#endregion
+
+//#region CRUD For languages table
+
+export async function createLanguage(L:any) {
+    try{
+        const db = await getDB();
+        const languageExist =  await db.get(`SELECT * FROM Langauge WHERE langiuage = ?`, [L.Langauge]);
+        if(languageExist){
+            console.error(`The Language already existis`)
+            return
+        }
+        const query =  `INSERT INTO Language (language) VALUES (?)`
+        const values = [
+            L.language
+        ]
+        await db.run(query, values);
+        console.log(`Language created successfully`);
+    }catch(error){
+       console.error(`Impossible to create the language please try again`, error.message);
+    }
 }
 //#endregion
