@@ -1,5 +1,6 @@
 import { promises } from "dns";
 import { getDB } from "../DB/Connection"    
+import { error } from "console";
 
 //#region CRUD for user table
 export async function createUser(user:any) {
@@ -119,7 +120,6 @@ export async function deleteUserByID(id:number): Promise<void> {
 }
 //#endregion 
 
-
 //#region CRUD for Status table
 //Create a Status
 export async function createStatus(status: any) 
@@ -139,4 +139,168 @@ export async function createStatus(status: any)
              }
          };
 
+//#endregion
+
+//#region CRUD for Role Table
+export async function getAllRoles() {
+    try{
+        const db = await getDB();
+        const query = `SELECT * FROM Role
+                        GROUP BY Role.id`
+        const roles = await db.all(query)
+        console.log(roles)
+        return roles        
+    }catch(error){
+        console.error(`Cant fetch the roles`, error.message);
+    }
+}
+
+export async function getRoleByID(id:number) {
+    try{
+        const db = await getDB();
+        const query = `SELECT * FROM Role WHERE Role.id = ?`;
+        const role =  db.get(query, [id]);
+        if(!role){
+            console.error(`Cant find role with id: ${id}`);
+            return null;
+        }
+        return role;
+    }catch(error){
+        console.error(`Couldnt fetch role with id ${id}`, error.message);
+    }
+}
+//#endregion
+
+//#region CRUD for Candidates table
+export async function createCandidate(candidate:any) {
+    try{
+        const db = await getDB();
+        const existingUser = await db.get (`SELECT * FROM candidate WHERE id = ?`, [candidate.id]);
+        if(existingUser){
+            console.error(`User with id ${candidate.id} already exists`);
+            return;
+        }
+        const query =  `INSERT INTO Candidate 
+                        (user_id, genre, experience_id, languages_id, status_id, education_id)
+                        VALUES (?, ?, ?, ?, ?, ? ) `
+        const values = [
+            candidate.user_id,
+            candidate.genre,
+            candidate.experience_id,
+            candidate.languages_id,
+            candidate.status_id,
+            candidate.education_id
+        ]
+        await db.run(query, values);
+        console.log(`Candidate assigned successfully`);
+    }catch(error){
+        console.error(`Something went wrong please try again`, error.message);
+    }
+}
+
+export async function getaAllCandidates() {
+    try{
+        const db = await getDB();
+        const query = `SELECT Candidate.*, 
+                    User.name, 
+                    language.language, 
+                    Status.status_name, 
+                    Experience.position_name, 
+                    Experience.company, 
+                    Education.degree, 
+                    Education.graduation_date
+                    FROM Candidate
+                    LEFT JOIN User ON User.id = Candidate.user_id
+                    LEFT JOIN language ON language.id = Candidate.languages_id
+                    LEFT JOIN Status ON Status.id = Candidate.status_id
+                    LEFT JOIN Experience ON Experience.id = Candidate.experience_id
+                    LEFT JOIN Education ON Education.id = Candidate.education_id
+                    GROUP BY Candidate.id;`
+        const candidates = await db.all(query);
+        console.log(`Candidates fetched successfully`);
+        return candidates;    
+    }catch(error){
+        console.error(`Impossible to fetch the candidates`, error.message);
+    }
+}
+
+export async function getCandidateByID(id:number) {
+    try{
+        const db = await getDB();
+        const query = `SELECT Candidate.*, 
+                    User.name, 
+                    language.language, 
+                    Status.status_name, 
+                    Experience.position_name, 
+                    Experience.company, 
+                    Education.degree, 
+                    Education.graduation_date
+                    FROM Candidate
+                    LEFT JOIN User ON User.id = Candidate.user_id
+                    LEFT JOIN language ON language.id = Candidate.languages_id
+                    LEFT JOIN Status ON Status.id = Candidate.status_id
+                    LEFT JOIN Experience ON Experience.id = Candidate.experience_id
+                    LEFT JOIN Education ON Education.id = Candidate.education_id
+                    WHERE Candidate.id = ?;
+                    GROUP BY Candidate.id;`
+        const candidate = db.get(query, [id]);
+        if(!candidate){
+            console.error(`Cant find candidate with id: ${id}`);
+        }
+        console.log(`Candidate with id: ${id} found:`, candidate);
+        return candidate;
+    }catch(error){
+        console.error(`Cant fetch the candidate, please try again`, error.message);
+    }
+}
+
+export async function editCandidateByID(id:number,
+     updates: Partial<{
+         genre: string,
+         experience_id: number,
+         language_id: number,
+         status_id: number,
+         education_id:number
+    }>) {
+
+      try{
+        const db =  await getDB();
+        const candidateExist = await db.get(`SELECT 1 FROM Candidate WHERE id = ?`, [id]);
+        if(!candidateExist){
+            throw new Error(`Candidate with id ${id} does not exist`);
+        }
+        if(Object.keys(updates).length === 0){
+            throw new Error(`No fields provided for update.`);
+        }
+        const fields = Object.keys(updates)
+            .map((key) => `${key} = ?`)
+            .join(", ");
+        const values =[...Object.values(updates), id];
+        
+        const query = `UPDATE Candidate SET ${fields} WHERE id = ?`;
+        await db.run(query, values);
+        console.log(`User withe id: ${id} updated successfully`);
+    }catch(error){
+        console.error(`Impossible to update the user with id ${id}`, (error as Error).message);
+    }
+}
+
+export async function deleteCandidateByID(id:number): Promise<void> {
+    try{
+        const db = await getDB();
+        const candidateExist = await db.get(`SELECT 1 FROM Candidate WHERE id = ?`, id);
+        if(!candidateExist){
+            throw new Error(`Candidate with id: ${id} does not exist`);
+        }
+        const query = `DELETE FROM Candidate WHERE id = ?`;
+        const result  = await db.run(query, id);
+        if(result.changes === 0){
+            throw new Error(`Failed to delete the Candidate with the id ${id}`);
+        }
+        console.log(`Candidate deleted successfully`);
+}catch(error){
+    console.error(`Error deleting the Candidate`, (error as Error).message);
+    throw Error;
+}
+}
 //#endregion

@@ -1,14 +1,9 @@
-import { createStatus } from "./CRUD";
+import { deleteCandidateByID } from "./CRUD";
 
 async function main() {
-    await createStatus({
-        payment_made: true,
-        current_student: false,
-        current_worker: true,
-        active_candidate: false,
-        applied: false,
-        open_offer: true
-    });
+   const candidate =  await deleteCandidateByID(1);
+   console.log(candidate);
+   return candidate
 }
 
 main();
