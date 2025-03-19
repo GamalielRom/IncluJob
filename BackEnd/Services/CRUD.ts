@@ -336,7 +336,7 @@ export async function deleteCandidateByID(id:number): Promise<void> {
 export async function createLanguage(L:any) {
     try{
         const db = await getDB();
-        const languageExist =  await db.get(`SELECT * FROM Langauge WHERE langiuage = ?`, [L.Langauge]);
+        const languageExist =  await db.get(`SELECT * FROM Langauge WHERE language = ?`, [L.Language]);
         if(languageExist){
             console.error(`The Language already existis`)
             return
@@ -423,4 +423,136 @@ export async function deleteLanguageByID(id:number): Promise<void> {
         throw Error;
     }
 }
+
 //#endregion
+
+
+//#region CRUD for Locations table
+export async function createLocation(location:any) {
+    try{
+        const db = await getDB();
+        const query = `INSERT INTO location (city, country,remote, remote_type, postal_code)
+                       VALUES (?, ?, ?, ?, ? )`;
+        const existingLocation = await db.get(`SELECT * FROM Location WHERE postal_code = ?`, [location.postal_code]);
+        if(existingLocation){
+            console.log(`This location already exist, please select another postal code`);
+        }
+        if(!['Full', 'Hybrid'].includes(location.remote_type)){
+            console.error('Remote type can only be full time or hybrid');
+            return
+        }
+        const values = [
+            location.city,
+            location.country,
+            location.remote,
+            location.remote_type,
+            location.postal_code
+        ]
+        await db.run(query, values);
+        console.log(`Location created succesfully`, location);
+    }catch(error){
+        console.error(`Impossible to create this location please try again`, error.message);
+    }
+}
+
+export async function getAllLocations() {
+    try{
+        const db = await getDB();
+        const query = `SELECT * FROM Location GROUP BY Location.country`;
+        const location = await db.all(query);
+        console.log(`Fetch location successfully`, location);
+        return location;
+    }catch(error){
+        console.error(`Error fetching locations`, error.message);
+    }
+}
+
+export async function getLocationsByCountry(country:string) {
+    try{ 
+        const db = await getDB();
+        const query = `SELECT * FROM Location WHERE country = ?`;
+        const locations = await db.all(query, [country]);
+        return locations;
+    }catch(error){
+        console.error(`Error fetching locations for country: ${country}`, error.message);
+    }
+}
+
+export async function getLocationByCity(city:string) {
+    try{ 
+        const db = await getDB();
+        const query = `SELECT * FROM Location WHERE city = ?`;
+        const locations = await db.all(query, [city]);
+        return locations;
+    }catch(error){
+        console.error(`Error fetching locations for country: ${city}`, error.message);
+    }
+}
+
+export async function getLocationByID(id:number) {
+    try{
+        const db = await getDB();
+        const query = `SELECT l.*
+                        FROM Location l 
+                        WHERE l.id = ?`;
+        const location = await db.get(query, [id]);
+        if(!location){
+            console.error(`No language found with id ${id}`);
+            return null;
+        }
+        return location;
+    }catch(error){
+        console.error(`Cant find language with id ${id}`, error.message);
+    }
+}
+
+export async function editLocationByID(id:number, updates:Partial<{
+    city:string,
+    country:string,
+    remote:boolean,
+    remote_type:string,
+    postal_code:string
+}>) {
+    try{
+        const db =  await getDB();
+        const locationExist = await db.get(`SELECT 1 FROM Location WHERE id = ?`, [id]);
+        if(!locationExist){
+            throw new Error(`Location with id ${id} does not exist`);
+        }
+        if(Object.keys(updates).length === 0){
+            throw new Error(`No fields provided for update.`);
+        }
+        const fields = Object.keys(updates)
+            .map((key) => `${key} = ?`)
+            .join(", ");
+        const values =[...Object.values(updates), id];
+        
+        const query = `UPDATE Location SET ${fields} WHERE id = ?`;
+        await db.run(query, values);
+        console.log(`User withe id: ${id} updated successfully`);
+    }catch(error){
+        console.error(`Impossible to update the Location with id ${id}`, (error as Error).message);
+    }
+}
+
+export async function deleteLocationByID(id:number): Promise <void> {
+    try{
+        const db = await getDB();
+        const locationExist = await db.get(`SELECT 1 FROM Location WHERE id = ?`, [id]);
+            if(!locationExist){
+                throw new Error(`Location with id: ${id} does not exist`);
+            }
+            const query = `DELETE FROM Location WHERE id = ?`;
+            const result  = await db.run(query, id);
+            if(result.changes === 0){
+                throw new Error(`Failed to delete the Language with the id ${id}`);
+            }
+            console.log(`Laguage deleted successfully`);
+    }catch(error){
+        console.error(`error deleting the Location`, (error as Error).message);
+        throw Error;
+    }
+}
+//#endregion
+
+
