@@ -138,7 +138,32 @@ export async function createStatus(status: any)
                  console.error('Cant add this status please try again', (error as Error).message);
              }
          };
-
+export async function getAllStatuses() {
+            try{
+                const db = await getDB();
+                const query = `SELECT * FROM Status `;
+                const status = await db.all(query);
+                return status;        
+            }catch(error){
+                console.error(`Cant fetch the statuses`, error.message);
+            }
+        }
+export async function getStatusByID(id:number) {
+            try{
+                const db = await getDB();
+                const query = `SELECT s.*
+                                FROM Status s 
+                                WHERE s.id = ?`;
+                const status = await db.get(query, [id]);
+                if(!status){
+                    console.error(`No status found with id ${id}`);
+                    return null;
+                }
+                return status;
+            }catch(error){
+                console.error(`Cant find status with id ${id}`, error.message);
+            }
+        }
 //#endregion
 
 //#region CRUD for Role Table
@@ -324,6 +349,78 @@ export async function createLanguage(L:any) {
         console.log(`Language created successfully`);
     }catch(error){
        console.error(`Impossible to create the language please try again`, error.message);
+    }
+}
+export async function getAllLanguages() {
+    try{
+        const db = await getDB();
+        const query = `SELECT * FROM Language `;
+        const language = await db.all(query);
+        return language;        
+    }catch(error){
+        console.error(`Cant fetch the languages`, error.message);
+    }
+}
+export async function getLanguageByID(id:number) {
+    try{
+        const db = await getDB();
+        const query = `SELECT l.*
+                        FROM Language l 
+                        WHERE l.id = ?`;
+        const language = await db.get(query, [id]);
+        if(!language){
+            console.error(`No language found with id ${id}`);
+            return null;
+        }
+        return language;
+    }catch(error){
+        console.error(`Cant find language with id ${id}`, error.message);
+    }
+}
+export async function editLanguageByID(id:number, 
+    updates: Partial <{
+        language: string
+    }>
+) {
+    try{
+        const db =  await getDB();
+        const languageExist = await db.get(`SELECT 1 FROM Language WHERE id = ?`, [id]);
+        if(!languageExist){
+            throw new Error(`Language with id ${id} does not exist`);
+        }
+        if(Object.keys(updates).length === 0){
+            throw new Error(`No fields provided for update.`);
+        }
+        const fields = Object.keys(updates)
+            .map((key) => `${key} = ?`)
+            .join(", ");
+        const values =[...Object.values(updates), id];
+        
+        const query = `UPDATE Language SET ${fields} WHERE id = ?`;
+
+        await db.run(query, values);
+        console.log(`Language withe id: ${id} updated successfully`);
+    }catch(error){
+        console.error(`Impossible to update the language with id ${id}`, (error as Error).message);
+    }
+}
+
+export async function deleteLanguageByID(id:number): Promise<void> {
+        try{
+            const db = await getDB();
+            const languageExist = await db.get(`SELECT 1 FROM Language WHERE id = ?`, id);
+            if(!languageExist){
+                throw new Error(`Language with id: ${id} does not exist`);
+            }
+            const query = `DELETE FROM Language WHERE id = ?`;
+            const result  = await db.run(query, id);
+            if(result.changes === 0){
+                throw new Error(`Failed to delete the Language with the id ${id}`);
+            }
+            console.log(`Laguage deleted successfully`);
+    }catch(error){
+        console.error(`error deleting the Language`, (error as Error).message);
+        throw Error;
     }
 }
 //#endregion
