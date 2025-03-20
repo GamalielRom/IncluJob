@@ -554,5 +554,140 @@ export async function deleteLocationByID(id:number): Promise <void> {
     }
 }
 //#endregion
+//#region CRUD for Education table
+export async function createEducation(education:any) {
+    try{
+        const db = await getDB();
+        //Education records are equal if the candidate ID, Institution number and Degree are the same
+        const educationExist =  await db.get( `SELECT * FROM Education WHERE candidate_id = ? AND institution_name = ? AND degree = ?`, [education.candidate_id, education.institution_name, education.degree]);
+        if(educationExist){
+            console.error(`The Education record already exists`)
+            return
+        }
+        const query =  `INSERT INTO Education (institution_name, started_date, graduation_date, degree, candidate_id, status_id) VALUES (?, ?, ?, ?, ?, ?)`
+        const values = [
+            education.institution_name,
+            education.started_date,
+            education.graduation_date,
+            education.degree,
+            education.candidate_id,
+            education.status_id
+        ]
+        await db.run(query, values);
+        console.log(`Education created successfully`);
+    }catch(error){
+       console.error(`Impossible to create the education please try again`, error.message);
+    }
+}
+export async function getAllEducations(){
+    try{
+        const db = await getDB();
+        const query = `SELECT e.institution_name, e.started_date, e.graduation_date, e.degree, u.name, s.status_name 
+        FROM Education e 
+        LEFT JOIN Candidate c ON e.candidate_id = c.id
+        LEFT JOIN Status s ON e.status_id = s.id
+        LEFT JOIN User u ON c.user_id = u.id
+        GROUP BY e.id;`
+        const educations = await db.all(query);
+        console.log(`Educations fetched successfully`)
+        return educations;
+    }
+    catch(error){
+        console.error(`Imposible to fetch the educations`, error.message)
+    }
+}
+export async function getEducationByID(id:number){
+    try
+    {
+        const db = await getDB();
+        const query =`SELECT e.institution_name, e.started_date, e.graduation_date, e.degree, u.name, s.status_name 
+            FROM Education e 
+            LEFT JOIN Candidate c ON e.candidate_id = c.id
+            LEFT JOIN Status s ON e.status_id = s.id
+            LEFT JOIN User u ON c.user_id = u.id
+            WHERE e.id = ?
+            GROUP BY e.id;`
+        const education = db.get(query,[id]);
+        if(!education){
+            console.error(`Cant find education record with id: ${id}`);
+        }
+        console.log(`Education record with id: ${id} found:`, education);
+        return education;
+    }
+    catch(error){
+        console.log(`Cant fetch the education record, please try again`, error.message)
+    }
+}
+export async function editEducationByID(id: number,
+    updates: Partial<{
+        institution_name: string,
+        started_date: Date,
+        graduation_date: Date,
+        degree: string,
+        candidate_id: number,
+        status_id: number
+    }>) {
 
+    // Function to format date to YYYY-MM-DD
+    const formatDate = (date?: Date) => {
+        return date ? date.toISOString().split('T')[0] : undefined;
+    };
+
+    try {
+        const db = await getDB();
+        const educationExist = await db.get(`SELECT 1 FROM Education WHERE id = ?`, [id]);
+        if (!educationExist) {
+            throw new Error(`Education record with id ${id} does not exist`);
+        }
+        if (Object.keys(updates).length === 0) {
+            throw new Error(`No fields provided for update.`);
+        }
+
+        // Format the dates before adding to the values array
+        const formattedStartedDate = updates.started_date ? formatDate(updates.started_date) : undefined;
+        const formattedGraduationDate = updates.graduation_date ? formatDate(updates.graduation_date) : undefined;
+
+        // Filter out undefined fields from the updates object
+        const filteredUpdates = {
+            ...updates,
+            started_date: formattedStartedDate,
+            graduation_date: formattedGraduationDate
+        };
+
+        // Prepare the fields and values arrays, excluding undefined values
+        const fields = Object.keys(filteredUpdates)
+            .filter(key => filteredUpdates[key] !== undefined) // Exclude undefined values
+            .map(key => `${key} = ?`)
+            .join(", ");
+        const values = Object.values(filteredUpdates)
+            .filter(value => value !== undefined); // Exclude undefined values
+        values.push(id); // Add the id at the end for the WHERE clause
+
+        const query = `UPDATE Education SET ${fields} WHERE id = ?`;
+        await db.run(query, values);
+        console.log(`Education record with id: ${id} updated successfully`);
+    } catch (error) {
+        console.error(`Impossible to update the education with id ${id}`, (error as Error).message);
+    }
+}
+
+export async function deleteEducationByID(id:number): Promise<void> {
+   try{
+       const db = await getDB();
+       const educationExist = await db.get(`SELECT 1 FROM Education WHERE id = ?`, id);
+       if(!educationExist){
+           throw new Error(`Education record with id: ${id} does not exist`);
+       }
+       const query = `DELETE FROM Education WHERE id = ?`;
+       const result  = await db.run(query, id);
+       if(result.changes === 0){
+           throw new Error(`Failed to delete the Education record with the id ${id}`);
+       }
+       console.log(`Education record deleted successfully`);
+    }catch(error){
+       console.error(`Error deleting the Education`, (error as Error).message);
+       throw Error;
+    }
+}
+//#endregion
 
