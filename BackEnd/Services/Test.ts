@@ -1,7 +1,7 @@
-import {deleteLanguageByID, createCandidate, editEducationByID, getAllEducations, getEducationByID} from "./CRUD";
+import {deleteIndustryByID} from "./CRUD";
 
 async function main() {
-   const candidate =  await getAllEducations();
+   const candidate =  await deleteIndustryByID(3);
    console.log(candidate);
    return candidate
 }
