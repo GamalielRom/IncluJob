@@ -692,7 +692,96 @@ export async function deleteEducationByID(id:number): Promise<void> {
     }
 }
 //#endregion
+//#region CRUD for Industry table
+export async function createIndustry(industry:any) {
+    try{
+        const db = await getDB();
+        const industryExist =  await db.get(`SELECT * FROM Industry WHERE industry_name = ?`, [industry.industry_name]);
+        if(industryExist){
+            console.error(`The Industry already exists`)
+            return
+        }
+        const query =  `INSERT INTO Industry (industry_name) VALUES (?)`
+        const values = [
+            industry.industry_name
+        ]
+        await db.run(query, values);
+        console.log(`Industry created successfully`);
+    }catch(error){
+       console.error(`Impossible to create the industry please try again`, error.message);
+    }
+}
+export async function getAllIndustries() {
+    try{
+        const db = await getDB();
+        const query = `SELECT * FROM Industry `;
+        const industry = await db.all(query);
+        return industry;        
+    }catch(error){
+        console.error(`Cant fetch the industries`, error.message);
+    }
+}
+export async function getIndustryByID(id:number) {
+    try{
+        const db = await getDB();
+        const query = `SELECT i.*
+                        FROM Industry i
+                        WHERE i.id = ?`;
+        const industry = await db.get(query, [id]);
+        if(!industry){
+            console.error(`No industry found with id ${id}`);
+            return null;
+        }
+        return industry;
+    }catch(error){
+        console.error(`Cant find industry with id ${id}`, error.message);
+    }
+}
+export async function editIndustryByID(id:number, 
+    updates: Partial <{
+        industry_name: string
+    }>
+) {
+    try{
+        const db =  await getDB();
+        const industryExist = await db.get(`SELECT 1 FROM Industry WHERE id = ?`, [id]);
+        if(!industryExist){
+            throw new Error(`Industry with id ${id} does not exist`);
+        }
+        if(Object.keys(updates).length === 0){
+            throw new Error(`No fields provided for update.`);
+        }
+        const fields = Object.keys(updates)
+            .map((key) => `${key} = ?`)
+            .join(", ");
+        const values =[...Object.values(updates), id];
+        
+        const query = `UPDATE Industry SET ${fields} WHERE id = ?`;
 
+        await db.run(query, values);
+        console.log(`Industry with id: ${id} updated successfully`);
+    }catch(error){
+        console.error(`Impossible to update the industry with id ${id}`, (error as Error).message);
+    }
+}
+export async function deleteIndustryByID(id:number): Promise<void> {
+        try{
+            const db = await getDB();
+            const industryExist = await db.get(`SELECT 1 FROM Industry WHERE id = ?`, id);
+            if(!industryExist){
+                throw new Error(`Industry with id: ${id} does not exist`);
+            }
+            const query = `DELETE FROM Industry WHERE id = ?`;
+            const result  = await db.run(query, id);
+            if(result.changes === 0){
+                throw new Error(`Failed to delete the industry with the id ${id}`);
+            }
+            console.log(`Industry deleted successfully`);
+    }catch(error){
+        console.error(`error deleting the industry`, (error as Error).message);
+//#endregion
+      
+      
 //#region CRUD for assistance devices table
 export async function createAssistanceDevice(AD:any) {
     try{
@@ -778,6 +867,7 @@ export async function deleteAssistanceDeviceByID(id:number): Promise<void> {
             console.log(`Device deleted successfully`);
     }catch(error){
         console.error(`error deleting the Device`, (error as Error).message);
+
         throw Error;
     }
 }
