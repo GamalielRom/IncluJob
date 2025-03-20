@@ -554,6 +554,8 @@ export async function deleteLocationByID(id:number): Promise <void> {
     }
 }
 //#endregion
+
+
 //#region CRUD for Education table
 export async function createEducation(education:any) {
     try{
@@ -762,7 +764,6 @@ export async function editIndustryByID(id:number,
         console.error(`Impossible to update the industry with id ${id}`, (error as Error).message);
     }
 }
-
 export async function deleteIndustryByID(id:number): Promise<void> {
         try{
             const db = await getDB();
@@ -778,6 +779,95 @@ export async function deleteIndustryByID(id:number): Promise<void> {
             console.log(`Industry deleted successfully`);
     }catch(error){
         console.error(`error deleting the industry`, (error as Error).message);
+//#endregion
+      
+      
+//#region CRUD for assistance devices table
+export async function createAssistanceDevice(AD:any) {
+    try{
+        const db = await getDB();
+        const ADExist =  await db.get(`SELECT * FROM AssistanceDevice WHERE device_name = ?`, [AD.device_name]);
+        if(ADExist){
+            console.error(`AssistanceDevice with name ${AD.device_name} already exists`);
+            return;
+        }
+        const query = `INSERT INTO AssistanceDevice (device_name) VALUES (?)`;
+        const values = [AD.device_name];
+        await db.all(query, values);
+        console.log(`Assistance device successfully created`);
+    }catch(error){
+        console.error(`Error trying to create this asssistance device please try again`, error.message);
+    }   
+}
+export async function getAllAssistanceDevices() {
+    try{
+        const db = await getDB();
+        const query = `SELECT * FROM AssistanceDevice`;
+        const AD = await db.all(query);
+        console.log(`Successfully fetch of the assistance devices`, AD);
+        return AD
+    }catch(error){
+        console.error(`Error fetching the assistance devices`, error.message);
+    }
+}
+
+export async function getAssistanceDeviceByID(id:number) {
+    try{
+        const db = await getDB();
+        const query = `SELECT * FROM AssistanceDevice WHERE AssistanceDevice.id = ?`;
+        const AD = await db.all(query, [id]);
+        if(!AD){
+            console.error(`No Assistance Device found with id ${id}`);
+            return null;
+        }
+        return AD
+    }catch(error){
+        console.error(`Error trying to find this Assistance Device please try again`, error.message);
+    } 
+}
+
+export async function editAssistanceDeviceByID(id:number, updates: Partial<{
+    device_name: string;
+}>) {
+    try{
+        const db =  await getDB();
+        const adExist = await db.get(`SELECT 1 FROM AssistanceDevice WHERE id = ?`, [id]);
+        if(!adExist){
+            throw new Error(`Assistance device with id ${id} does not exist`);
+        }
+        if(Object.keys(updates).length === 0){
+            throw new Error(`No fields provided for update.`);
+        }
+        const fields = Object.keys(updates)
+            .map((key) => `${key} = ?`)
+            .join(", ");
+        const values =[...Object.values(updates), id];
+        
+        const query = `UPDATE AssistanceDevice SET ${fields} WHERE id = ?`;
+
+        await db.run(query, values);
+        console.log(`Assistance Device withe id: ${id} updated successfully`);
+    }catch(error){
+        console.error(`Impossible to update the Assistance device with id ${id}`, (error as Error).message);
+    }
+}
+
+export async function deleteAssistanceDeviceByID(id:number): Promise<void> {
+    try{
+        const db = await getDB();
+        const adExist = await db.get(`SELECT 1 FROM AssistanceDevice WHERE id = ?`, [id]);
+            if(!adExist){
+                throw new Error(`Asssitance device with id: ${id} does not exist`);
+            }
+            const query = `DELETE FROM AssistanceDevice WHERE id = ?`;
+            const result  = await db.run(query, id);
+            if(result.changes === 0){
+                throw new Error(`Failed to delete the Device with the id ${id}`);
+            }
+            console.log(`Device deleted successfully`);
+    }catch(error){
+        console.error(`error deleting the Device`, (error as Error).message);
+
         throw Error;
     }
 }
