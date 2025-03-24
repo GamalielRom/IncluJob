@@ -269,14 +269,16 @@ export async function getCandidateByID(id:number) {
                     LEFT JOIN Education ON Education.id = Candidate.education_id
                     WHERE Candidate.id = ?;
                     GROUP BY Candidate.id;`
-        const candidate = db.get(query, [id]);
+        const candidate = await db.get(query, [id]);
         if(!candidate){
             console.error(`Cant find candidate with id: ${id}`);
+            return null;
         }
         console.log(`Candidate with id: ${id} found:`, candidate);
         return candidate;
     }catch(error){
         console.error(`Cant fetch the candidate, please try again`, error.message);
+        throw error
     }
 }
 
@@ -876,3 +878,128 @@ export async function deleteIndustryByID(id:number): Promise<void> {
     }
 }
 //#endregion
+
+//#region CRUD For Employers
+export async function createEmployer(employer:any) {
+    try{
+        const db = await getDB();
+        const existingEmployer = await db.get (`SELECT * FROM Employer WHERE company_name = ? AND location = ?`, [employer.company_name, employer.location]);
+        if(existingEmployer){
+            console.error(`Employer  ${employer.company_name} already exists`);
+            return;
+        }
+        const query =  `INSERT INTO Employer 
+                        (company_name, location, company_size, hiring_policy, status_id, user_id)
+                        VALUES (?, ?, ?, ?, ?, ? ) `
+        const values = [
+            employer.company_name,
+            employer.location,
+            employer.company_size,
+            employer.hiring_policy,
+            employer.status_id,
+            employer.user_id
+        ]
+        await db.run(query, values);
+        console.log(`Employer created successfully`);
+    }catch(error){
+        console.error(`Something went wrong please try again`, error.message);
+    }
+}
+
+export async function getaAllEmployers() {
+    try{
+        const db = await getDB();
+        const query = `SELECT e.*, 
+					s.status_name,
+					u.name as 'User name'
+                    FROM Employer e
+                    LEFT JOIN User u ON u.id = e.user_id
+                    LEFT JOIN Status s ON s.id = e.status_id
+                    GROUP BY e.id;`
+        const employers = await db.all(query);
+        console.log(`Employers fetched successfully`);
+        return employers;    
+    }catch(error){
+        console.error(`Impossible to fetch the employers`, error.message);
+    }
+}
+
+export async function getEmployerByID(id:number) {
+    try{
+        const db = await getDB();
+        const query = `SELECT e.*, 
+					s.status_name,
+					u.name as 'User name'
+                    FROM Employer e
+                    LEFT JOIN User u ON u.id = e.user_id
+                    LEFT JOIN Status s ON s.id = e.status_id
+                    WHERE e.id = ?;`
+        const employer = await db.get(query, [id]);
+        if(!employer){
+            console.error(`Cant find employer with id: ${id}`);
+            return null;
+        }
+        console.log(`Employer with id: ${id} found:`, employer);
+        return employer;
+    }catch(error){
+        console.error(`Cant fetch the employer, please try again`, error.message);
+        throw error;
+    }
+}
+
+export async function editEmployerByID(id:number,
+     updates: Partial<{
+         company_name: string,
+         location: string,
+         company_size: string,
+         hiring_policy:string,
+         status_id: number,
+         user_id:number
+    }>) {
+
+      try{
+        const db =  await getDB();
+        const employerExist = await db.get(`SELECT 1 FROM Employer WHERE id = ?`, [id]);
+        if(!employerExist){
+            throw new Error(`Employer with id ${id} does not exist`);
+        }
+        if(Object.keys(updates).length === 0){
+            throw new Error(`No fields provided for update.`);
+        }
+        const fields = Object.keys(updates)
+            .map((key) => `${key} = ?`)
+            .join(", ");
+        const values =[...Object.values(updates), id];
+        
+        const query = `UPDATE Employer SET ${fields} WHERE id = ?`;
+        await db.run(query, values);
+        console.log(`Employer with id: ${id} updated successfully`);
+    }catch(error){
+        console.error(`Impossible to update the employer with id ${id}`, (error as Error).message);
+        throw error;
+    }
+}
+
+export async function deleteEmployerByID(id:number): Promise<void> {
+    try{
+        const db = await getDB();
+        const employerExist = await db.get(`SELECT 1 FROM Employer WHERE id = ?`, [id]);
+        if(!employerExist){
+            throw new Error(`Employer with id: ${id} does not exist`);
+        }
+        const query = `DELETE FROM Employer WHERE id = ?`;
+        const result  = await db.run(query, [id]);
+        if(result.changes === 0){
+            throw new Error(`Failed to delete the employer with the id ${id}`);
+        }
+        console.log(`Employer deleted successfully`);
+    }catch(error){
+        console.error(`Error deleting the employer`, (error as Error).message);
+        throw Error;
+    }
+}
+//#endregion
+
+
+
+
