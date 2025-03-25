@@ -283,6 +283,29 @@ export async function getCandidateByID(id:number) {
     }
 }
 
+
+export async function getAllExperienceByCandidateID(user_id:number) {
+    try{
+        const db = await getDB();
+        const userExist = await db.get( `SELECT * FROM User WHERE id = ?`, [user_id]);
+        if(!userExist){
+            console.log("This candidate do not exist please try with other")
+            return null
+        }
+        const query = `SELECT e.position_name, e.description, e.start_date, e.end_date, e.company,u.name AS user_name, s.status_name
+        FROM Experience e
+        LEFT JOIN Candidate c ON c.id = e.candidate_id
+        LEFT JOIN User u ON u.id = c.user_id
+        LEFT JOIN Status s ON s.id = e.status_id
+        WHERE u.id = ?`
+        const experience = await db.all(query, [user_id]);
+        console.log(`Experience by candidate with id ${user_id} sucessfully fetched`);
+        return experience
+    }catch(error){
+        console.error('Impossible to fetch the experience for this user please try again', error.message);
+    }
+}
+
 export async function editCandidateByID(id:number,
      updates: Partial<{
          genre: string,
@@ -1329,4 +1352,127 @@ export async function deleteDisabilityByID(id:number): Promise<void> {
     }
 }
 //#endregion
+
+//#region Experience CRUD
+
+export async function createExperience(experience:any) {
+    try{
+        const db =  await getDB();
+        const candidateExist = await db.get("SELECT 1 FROM Candidate WHERE id = ?", [experience.candidate_id]);
+        if (!candidateExist) {
+            console.error("❌ Candidate does not exist. Cannot add experience.");
+            return;
+        }
+        const query = `INSERT INTO Experience (position_name, description, start_date, end_date, company, candidate_id, status_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)`
+        const values = [
+            experience.position_name,
+            experience.description,
+            experience.start_date,
+            experience.end_date,
+            experience.company,
+            experience.candidate_id,
+            experience.status_id
+        ]
+        await db.run(query, values)
+        console.log(`Successfully created the experience`)
+    }catch(error){
+        console.error(`Cant create this experience please try again`, error.message);
+    }
+}
+export async function getExperienceByID(id:number) {
+    try{
+        const db = await getDB();
+        const query = `
+                        SELECT e.position_name, e.description, e.start_date, e.end_date, e.company, s.status_name
+                        FROM Experience e
+                        LEFT JOIN Candidate c ON c.id = e.candidate_id
+                        LEFT JOIN Status s ON s.id = e.status_id
+                        WHERE e.id = ?`
+        const experience = await db.get(query, [id]);
+        if (!experience) {
+            console.log(`No experience found with ID: ${id}`);
+            return null;
+        }
+        console.log(`Successfully fetched the experience for id: ${id}`);
+        return experience;
+    }catch(error){
+        console.error(`Impossible to fetch the data from experience with id ${id}`);
+    }
+}
+
+export async function editExperienceByID(id:number, updates: Partial<{
+    position_name:string,
+    description:string,
+    start_date:Date,
+    end_date: Date,
+    company: string,
+    candidate_id: number,
+    status_id: number
+}>) {
+    const formatDate = (date?: Date) => {
+        return date ? date.toISOString().split('T')[0] : undefined;
+    };
+
+    try {
+        const db = await getDB();
+
+        // Check if the record exists
+        const experience = await db.get(`SELECT 1 FROM Experience WHERE id = ?`, [id]);
+        if (!experience) {
+            throw new Error(`Experience with ID ${id} does not exist.`);
+        }
+
+        if (Object.keys(updates).length === 0) {
+            throw new Error(`No fields provided for update.`);
+        }
+
+        // Format the date fields before adding to the values array
+        const formattedStartDate = updates.start_date ? formatDate(updates.start_date) : undefined;
+        const formattedEndDate = updates.end_date ? formatDate(updates.end_date) : undefined;
+
+        // Filter out undefined fields from the updates object
+        const filteredUpdates = {
+            ...updates,
+            start_date: formattedStartDate,
+            end_date: formattedEndDate,
+        };
+
+        // Prepare the fields and values arrays, excluding undefined values
+        const fields = Object.keys(filteredUpdates)
+            .filter(key => filteredUpdates[key] !== undefined) // Exclude undefined values
+            .map(key => `${key} = ?`)
+            .join(", ");
+        const values = Object.values(filteredUpdates)
+            .filter(value => value !== undefined); // Exclude undefined values
+        values.push(id); // Add the id at the end for the WHERE clause
+
+        const query = `UPDATE Experience SET ${fields} WHERE id = ?`;
+        await db.run(query, values);
+        console.log(`Experience with ID ${id} updated successfully.`);
+    } catch (error) {
+        console.error(`Impossible to update Experience with ID ${id}:`, error.message);
+    }
+    
+}
+
+export async function deleteExperienceByID(id:number): Promise<void> {
+    try{
+        const db = await getDB();
+        const experienceExist = await db.get(`SELECT 1 FROM Experience WHERE id = ?`, [id]);
+        if(!experienceExist){
+            throw new Error(`Experience with id: ${id} does not exist`);
+        }
+        const query = `DELETE FROM Experience WHERE id = ?`;
+        const result  = await db.run(query, [id]);
+        if(result.changes === 0){
+            throw new Error(`Failed to delete the experience with the id ${id}`);
+        }
+        console.log(`experience deleted successfully`);
+    }catch(error){
+        console.error(`Error deleting the experience`, (error as Error).message);
+        throw new Error(error.message);
+    }
+}
+//#endregion 
 
