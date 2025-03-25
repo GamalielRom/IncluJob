@@ -1,7 +1,7 @@
-import {deleteIndustryByID} from "./CRUD";
+import { createEmployerPayment, deleteEmployerByID, deleteEmployerPaymentByID, editEmployerPaymentByID, getAllEmployerPayments, getEmployerPaymentHistory, getLastEmployerPayment} from "./CRUD";
 
 async function main() {
-   const candidate =  await deleteIndustryByID(3);
+   const candidate =  await getAllEmployerPayments();
    console.log(candidate);
    return candidate
 }
