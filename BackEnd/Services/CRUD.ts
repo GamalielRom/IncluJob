@@ -1223,5 +1223,110 @@ export async function deleteEmployerPaymentByID(id: number) {
 }
 //#endregion
 
+//#region Disabilities CRUD
+export async function createDisability(disability:any) {
+    try{
+        const db = await getDB();
+        const disabilityExist = await db.get("SELECT 1 FROM Disability Where disability_type = ?", [disability.disability_type]);
+        if(disabilityExist){
+            console.error("Disability already exist");
+            return;
+        }
+        const query = `INSERT INTO Disability (disability_type, related_disease, description, disability_rate, assistance_device_id)
+                        VALUES (?, ?, ?, ?, ?)`
+        const values = [
+            disability.disability_type,
+            disability.related_disease,
+            disability.description,
+            disability.disability_rate,
+            disability.assistance_device_id
+        ]
+        await db.run(query,values);
+        console.log("Employer Payment record created succesfully")
+    }catch(error){
+        console.error('Impossible to create the disability please try again', error.message);
+    }
+}
 
+export async function getAllDisabilities() {
+    try{
+        const db = await getDB();
+        const query =`SELECT d.disability_type, d.related_disease, d.description, d.disability_rate, a.device_name
+                                    FROM Disability d
+                                    LEFT JOIN AssistanceDevice a ON d.assistance_device_id = a.id
+                                    ORDER BY d.id
+                                    `;
+        const disabilities = await db.all(query);
+        console.log("Disabilities fetch successfully");
+        return disabilities;
+    }catch(error){
+        console.error('Impossible to fetch the disabilities', error.message);
+    }   
+}
+export async function getDisabilityByID(id:number) {
+    try{
+        const db = await getDB();
+        const query =  `SELECT d.disability_type, d.related_disease, d.description, d.disability_rate, a.device_name
+                        FROM Disability d
+                        LEFT JOIN AssistanceDevice a ON d.assistance_device_id = a.id
+                        WHERE d.id = ?
+                        ORDER BY d.id
+                        `
+        const disability = db.get(query, [id]);
+        console.log(`Sucessfully fetch of disability with id ${id}`);
+        return disability;
+    }catch(error){
+        console.error(`Impossible to fetch disability with id: ${id}`,error.message);
+    }
+}
+
+export async function editDisabilityByID(id:number, updates:Partial<{
+    disability_type: string,
+    related_disease:string,
+    description:string,
+    disability_rate:number,
+    assistance_device_id:number
+}>) {
+    try{
+        const db = await getDB();
+        const disabilityExist = await db.get(`SELECT 1 FROM Disability WHERE id = ?`, [id]);
+        if(!disabilityExist){
+            throw new Error(`Disability with id ${id} does not exist`);
+        }
+        if(Object.keys(updates).length === 0){
+            throw new Error(`No fields provided for update.`);
+        }
+        const fields = Object.keys(updates)
+            .map((key) => `${key} = ?`)
+            .join(", ");
+        const values =[...Object.values(updates), id];
+        
+        const query = `UPDATE Disability SET ${fields} WHERE id = ?`;
+
+        await db.run(query, values);
+        console.log(`Disability with id: ${id} updated successfully`);
+    }catch(error){
+        console.error(`Impossible to update the disability with id ${id}`, (error as Error).message);
+    }
+}
+
+export async function deleteDisabilityByID(id:number): Promise<void> {
+    try{
+        const db = await getDB();
+        const disabilityExist = await db.get(`SELECT 1 FROM Disability WHERE id = ?`, [id]);
+        if(!disabilityExist){
+            throw new Error(`Disability with id: ${id} does not exist`);
+        }
+        const query = `DELETE FROM Disability WHERE id = ?`;
+        const result  = await db.run(query, [id]);
+        if(result.changes === 0){
+            throw new Error(`Failed to delete the disability with the id ${id}`);
+        }
+        console.log(`disability deleted successfully`);
+    }catch(error){
+        console.error(`Error deleting the disability`, (error as Error).message);
+        throw new Error(error.message);
+    }
+}
+//#endregion
 
