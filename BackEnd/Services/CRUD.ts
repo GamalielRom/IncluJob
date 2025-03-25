@@ -1,6 +1,7 @@
 import { promises } from "dns";
 import { getDB } from "../DB/Connection"    
 import { error } from "console";
+import { getgid } from "process";
 
 //#region CRUD for user table
 export async function createUser(user:any) {
@@ -1000,6 +1001,227 @@ export async function deleteEmployerByID(id:number): Promise<void> {
 }
 //#endregion
 
+//#region EmployerPayments CRUD
+export async function createEmployerPayment(empPayment: any){
+    try{
+        const db = await getDB();
+        //A record is the same if the employer ID, subscription type, start date and  end date are the same
+        // Check if record already exists
+        const empPaymentExist = await db.get(
+            `SELECT 1 FROM EmployerPayment 
+             WHERE subscription_type = ? 
+             AND subscription_start = ? 
+             AND subscription_end = ? 
+             AND employer_id = ?`,
+            [
+                empPayment.subscription_type,
+                empPayment.subscription_start,
+                empPayment.subscription_end, // FIXED TYPO
+                empPayment.employer_id
+            ]
+        );
+
+        if (empPaymentExist) {
+            console.error("The Employer Payment record already exists.");
+            return;
+        }
+        const query = `INSERT INTO EmployerPayment 
+                    (subscription_type,employer_id,payment_date,amount,payment_method,currency,subscription_start,subscription_end,receipt_url,status_id)
+                    VALUES (?,?,?,?,?,?,?,?,?,?)`
+        const values =[
+            empPayment.subscription_type,
+            empPayment.employer_id,
+            empPayment.payment_date,
+            empPayment.amount,
+            empPayment.payment_method,
+            empPayment.currency,
+            empPayment.subscription_start,
+            empPayment.subscription_end,
+            empPayment.receipt_url,
+            empPayment.status_id
+        ]
+        await db.run(query,values);
+        console.log("Employer Payment record created succesfully")
+    }catch(error){
+        console.error(`Impossible to create the emnpployer payment record, please try again`, error.message);
+    }
+}
+export async function getAllEmployerPayments(){
+    try{
+        const db = await getDB();
+        const query = `SELECT 
+        e.company_name AS Employer_Name,
+        s.status_name AS Status_Name,
+        ep.subscription_type, ep.payment_date, ep.amount, ep.currency, ep.subscription_start, ep.subscription_end, ep.payment_method, ep.receipt_url
+        FROM EmployerPayment ep
+        JOIN Employer e ON ep.employer_id = e.id
+        JOIN Status s ON ep.status_id = s.id;`
+        const empPayments = await db.all(query);
+        console.log(`Employer Payments fetched successfully`);
+        return empPayments;
+    }catch(error){
+        console.error(`Impossible to fetch the employer payments`, error.message)
+        return [];
+    }
+}
+//Get the LAST payment for each employer\
+//Instead of Using the EmployerPayment ID, it will use the employer ID
+export async function getLastEmployerPayment(employerId: number) {
+    try {
+        const db = await getDB();
+        const query = `
+            SELECT 
+                e.company_name AS Employer_Name,
+                s.status_name AS Status_Name,
+                ep.subscription_type, 
+                ep.payment_date, 
+                ep.amount, 
+                ep.currency, 
+                ep.subscription_start, 
+                ep.subscription_end, 
+                ep.payment_method, 
+                ep.receipt_url
+            FROM EmployerPayment ep
+            JOIN Employer e ON ep.employer_id = e.id
+            JOIN Status s ON ep.status_id = s.id
+            WHERE ep.employer_id = ?
+            ORDER BY ep.payment_date DESC
+            LIMIT 1;
+        `;
+
+        const lastPayment = await db.get(query, [employerId]);
+
+        if (!lastPayment) {
+            console.log(`No payment record found for employer ID: ${employerId}`);
+            return null;
+        }
+
+        console.log(`Last payment for employer ID ${employerId} fetched successfully.`);
+        return lastPayment;
+    } catch (error) {
+        console.error(`Impossible to fetch the last employer payment:`, error.message);
+        return null;
+    }
+}
+//Get all the payments history made by an Employer
+export async function getEmployerPaymentHistory(employerId: number) {
+    try {
+        const db = await getDB();
+        const query = `
+            SELECT 
+                e.company_name AS Employer_Name,
+                s.status_name AS Status_Name,
+                ep.subscription_type, 
+                ep.payment_date, 
+                ep.amount, 
+                ep.currency, 
+                ep.subscription_start, 
+                ep.subscription_end, 
+                ep.payment_method, 
+                ep.receipt_url
+            FROM EmployerPayment ep
+            JOIN Employer e ON ep.employer_id = e.id
+            JOIN Status s ON ep.status_id = s.id
+            WHERE ep.employer_id = ?
+            ORDER BY ep.payment_date DESC;
+        `;
+
+        const empPaymentHistory = await db.get(query, [employerId]);
+
+        if (!empPaymentHistory) {
+            console.log(`No payments records found for employer ID: ${employerId}`);
+            return null;
+        }
+
+        console.log(`Employer payment history for employer ID ${employerId} fetched successfully.`);
+        return empPaymentHistory;
+    } catch (error) {
+        console.error(`Impossible to fetch the employer payment history:`, error.message);
+        return null;
+    }
+}
+export async function editEmployerPaymentByID(id: number,
+    updates: Partial<{
+        subscription_type: string;
+        employer_id: number;
+        payment_date: Date;
+        amount: number;
+        payment_method: string;
+        currency: string;
+        subscription_start: Date;
+        subscription_end: Date;
+        receipt_url: string;
+        status_id: number;
+    }>
+) {
+    // Function to format date to YYYY-MM-DD
+    const formatDate = (date?: Date) => {
+        return date ? date.toISOString().split('T')[0] : undefined;
+    };
+
+    try {
+        const db = await getDB();
+
+        // Check if the record exists
+        const paymentExists = await db.get(`SELECT 1 FROM EmployerPayment WHERE id = ?`, [id]);
+        if (!paymentExists) {
+            throw new Error(`Employer Payment with ID ${id} does not exist.`);
+        }
+
+        if (Object.keys(updates).length === 0) {
+            throw new Error(`No fields provided for update.`);
+        }
+
+        // Format the date fields before adding to the values array
+        const formattedPaymentDate = updates.payment_date ? formatDate(updates.payment_date) : undefined;
+        const formattedSubscriptionStart = updates.subscription_start ? formatDate(updates.subscription_start) : undefined;
+        const formattedSubscriptionEnd = updates.subscription_end ? formatDate(updates.subscription_end) : undefined;
+
+        // Filter out undefined fields from the updates object
+        const filteredUpdates = {
+            ...updates,
+            payment_date: formattedPaymentDate,
+            subscription_start: formattedSubscriptionStart,
+            subscription_end: formattedSubscriptionEnd
+        };
+
+        // Prepare the fields and values arrays, excluding undefined values
+        const fields = Object.keys(filteredUpdates)
+            .filter(key => filteredUpdates[key] !== undefined) // Exclude undefined values
+            .map(key => `${key} = ?`)
+            .join(", ");
+        const values = Object.values(filteredUpdates)
+            .filter(value => value !== undefined); // Exclude undefined values
+        values.push(id); // Add the id at the end for the WHERE clause
+
+        const query = `UPDATE EmployerPayment SET ${fields} WHERE id = ?`;
+        await db.run(query, values);
+        console.log(`Employer Payment with ID ${id} updated successfully.`);
+    } catch (error) {
+        console.error(`Impossible to update Employer Payment with ID ${id}:`, error.message);
+    }
+}
+export async function deleteEmployerPaymentByID(id: number) {
+    try {
+        const db = await getDB();
+
+        // Check if the record exists
+        const paymentExists = await db.get(`SELECT 1 FROM EmployerPayment WHERE id = ?`, [id]);
+        if (!paymentExists) {
+            console.error(`Employer Payment with ID ${id} not found.`);
+            return null;
+        }
+
+        // Delete the record
+        await db.run(`DELETE FROM EmployerPayment WHERE id = ?`, [id]);
+        console.log(`Employer Payment with ID ${id} deleted successfully.`);
+        return true;
+    } catch (error) {
+        console.error(`Impossible to delete Employer Payment:`, error.message);
+        return null;
+    }
+}
+//#endregion
 
 
 
