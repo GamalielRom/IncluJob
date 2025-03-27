@@ -1360,7 +1360,7 @@ export async function createExperience(experience:any) {
         const db =  await getDB();
         const candidateExist = await db.get("SELECT 1 FROM Candidate WHERE id = ?", [experience.candidate_id]);
         if (!candidateExist) {
-            console.error("❌ Candidate does not exist. Cannot add experience.");
+            console.error("Candidate does not exist. Cannot add experience.");
             return;
         }
         const query = `INSERT INTO Experience (position_name, description, start_date, end_date, company, candidate_id, status_id)
@@ -1475,4 +1475,191 @@ export async function deleteExperienceByID(id:number): Promise<void> {
     }
 }
 //#endregion 
+
+//#region for JobOffer
+export async function createJobOffer(jobOffer:any) {
+    try{
+        const db = await getDB();
+        const employerExist = await db.get("SELECT 1 FROM Employer WHERE id = ?", [jobOffer.employer_id]);
+        if (!employerExist) {
+            console.error("Employer does not exist. Cannot create job offer.");
+            return;
+        }
+
+        const locationExist = await db.get("SELECT 1 FROM Location WHERE id = ?", [jobOffer.location_id]);
+        if (!locationExist) {
+            console.error("Location does not exist. Cannot create job offer.");
+            return;
+        }
+
+        const industryExist = await db.get("SELECT 1 FROM Industry WHERE id = ?", [jobOffer.industry_id]);
+        if (!industryExist) {
+            console.error("Industry does not exist. Cannot create job offer.");
+            return;
+        }
+
+        const statusExist = await db.get("SELECT 1 FROM Status WHERE id = ?", [jobOffer.status_id]);
+        if (!statusExist) {
+            console.error("Status does not exist. Cannot create job offer.");
+            return;
+        }
+        const query = `INSERT INTO JobOffer (title, job_type, job_duration, description, requirements, experience_required, experience_level, salary, accommodation_details, 
+                        status_id, location_id, industry_id, employer_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        `;
+        const values = [
+            jobOffer.title,
+            jobOffer.job_type,
+            jobOffer.job_duration,
+            jobOffer.description,
+            jobOffer.requirements,
+            jobOffer.experience_required,
+            jobOffer.experience_level,
+            jobOffer.salary,
+            jobOffer.accommodation_details,
+            jobOffer.status_id,
+            jobOffer.location_id,
+            jobOffer.industry_id,
+            jobOffer.employer_id
+        ];
+        await db.run(query, values);
+        console.log("Job Offer created sucessfully");
+    }catch(error){
+        console.error("Imposible to create this job offer", error.message);
+    }
+}
+
+export async function getJobOfferByIndustry(industry_id:number) {
+    try{
+        const db = await getDB();
+        const industryExist = await db.get(`SELECT * FROM Industry WHERE id = ?`, [industry_id]);
+        if(!industryExist){
+            console.error(`This industry with id ${industry_id} does not exist`);
+            return
+        }
+        const jobOffers =await db.all( `SELECT jo.title, jo.job_type, jo.job_duration, jo.description, jo.requirements,e.company_name, jo.experience_required, jo.experience_level, jo.salary, jo.created_at, i.industry_name, s.status_name, l.city, l.country, l.remote_type
+                        FROM JobOffer jo
+                        LEFT JOIN  Industry i ON jo.industry_id = i.id
+                        LEFT JOIN Status s ON jo.status_id = s.id
+                        LEFT JOIN Location l ON jo.l ocation_id = l.id
+                        LEFT JOIN Employer e ON jo.employer_id = e.id
+                        WHERE jo.industry_id = ?`, [industry_id]);
+        if (jobOffers.length === 0) {
+            console.log(`No job offers found for industry ID ${industry_id}.`);
+            return null;
+        }
+        console.log(`Successfully fetched the job offers for the industry: ${industry_id}`);
+        return jobOffers
+    }catch(error){
+        console.error('Error trying to fetch the job offers by that industry please try again', error.message);
+    }   
+}
+
+export async function getJobOffersByEmployer(employer_id:number) {
+    try{
+        const db = await getDB();
+        const companyExist = await db.get(`SELECT * FROM Employer WHERE id = ?`, [employer_id]);
+        if(!companyExist){
+            console.error(`This employer with id ${employer_id} does not exist`);
+            return
+        }
+        const jobOffers = await db.all( `SELECT jo.title, jo.job_type, jo.job_duration, jo.description, jo.requirements,e.company_name, jo.experience_required, jo.experience_level, jo.salary, jo.created_at, i.industry_name, s.status_name, l.city, l.country, l.remote_type
+                        FROM JobOffer jo
+                        LEFT JOIN  Industry i ON jo.industry_id = i.id
+                        LEFT JOIN Status s ON jo.status_id = s.id
+                        LEFT JOIN Location l ON jo.location_id = l.id
+                        LEFT JOIN Employer e ON jo.employer_id = e.id
+                        WHERE jo.employer_id = ?`, [employer_id]);
+        if(jobOffers.length === 0){
+            console.log(`There are not job offer for this company`);;
+            return null
+        }
+        console.log(`Successfully fetched the job offers for the employer ${employer_id}`);
+        return jobOffers;
+    }catch(error){
+        console.error(`Error fetching the job offers for that employer`, error.message);
+    }
+}
+
+
+
+export async function getJobOfferByID(id:number) {
+    try{
+        const db = await getDB();
+        const jobOfferExist = await db.get(`SELECT * FROM JobOffer WHERE id = ?`, [id]);
+        if(!jobOfferExist){
+            console.error(`This job offer is no longer avaliable`);
+            return;
+        }
+        const jobOffer = await db.get(`SELECT jo.title, jo.job_type, jo.job_duration, jo.description, jo.requirements,e.company_name, jo.experience_required, jo.experience_level, jo.salary, jo.created_at, i.industry_name, s.status_name, l.city, l.country, l.remote_type
+                                    FROM JobOffer jo
+                                    LEFT JOIN  Industry i ON jo.industry_id = i.id
+                                    LEFT JOIN Status s ON jo.status_id = s.id
+                                    LEFT JOIN Location l ON jo.location_id = l.id
+                                    LEFT JOIN Employer e ON jo.employer_id = e.id
+                                    WHERE jo.id = ?`, [id]);
+        console.log(`Successfully fetched the job offer`);
+        return jobOffer;
+    }catch(error){
+        console.error(`Error fetching the job offer with id ${id}`, error.message);
+    }
+}
+
+export async function editJobOfferByID(id:number, updates: Partial<{
+    title:string,
+    job_type: string,
+    job_duration:string, 
+    requirements: string,
+    experience_required:number,
+    experience_level:string,
+    salary: number,
+    accommodation_details: string,
+    status_id: number,
+    location_id: number,
+    industry_id:number,
+    employer_id: number
+}>) {
+    try{
+        const db = await getDB();
+        const jobOfferExist =  await db.get(`SELECT * FROM Employer WHERE id = ?`, [id]);
+        if(!jobOfferExist){
+            console.error(`This job offer with id ${id} does not exist`);
+            return;
+        }
+        if(Object.keys(updates).length === 0){
+            throw new Error(`No fields provided for update.`);
+        }
+        const fields = Object.keys(updates)
+            .map((key) => `${key} = ?`)
+            .join(", ");
+        const values =[...Object.values(updates), id];
+        
+        const query = `UPDATE JobOffer SET ${fields} WHERE id = ?`;
+
+        await db.run(query, values);
+        console.log(`Job offer with id: ${id} updated successfully`);
+    }catch(error){
+        console.error(`Impossible to update the job offer with id ${id}`, (error as Error).message);
+    }
+}
+
+export async function deleteJobOfferByID(id:number): Promise<void> {
+    try{
+        const db = await getDB();
+        const userExist = await db.get(`SELECT 1 FROM JobOffer WHERE id = ?`, id);
+        if(!userExist){
+            throw new Error(`Job Offer with id: ${id} does not exist`);
+        }
+        const query = `DELETE FROM Job Offer WHERE id = ?`;
+        const result  = await db.run(query, id);
+        if(result.changes === 0){
+            throw new Error(`Failed to delete the User with the id ${id}`);
+        }
+        console.log(`Job offer deleted successfully`);
+}catch(error){
+    console.error(`error deleting the Job Offer`, (error as Error).message);
+    throw new Error(error.message);
+}
+}
+//#endregion
 
