@@ -1476,7 +1476,7 @@ export async function deleteExperienceByID(id:number): Promise<void> {
 }
 //#endregion 
 
-//#region for JobOffer
+//#region for JobOffer CRUD
 export async function createJobOffer(jobOffer:any) {
     try{
         const db = await getDB();
@@ -1663,3 +1663,276 @@ export async function deleteJobOfferByID(id:number): Promise<void> {
 }
 //#endregion
 
+//#region JobApplications CRUD
+export async function  createJobApplication(application: any){
+    try{
+        const db = await getDB();
+        //To applicate for a job we need to make sure the job exist
+        const jobExist = await db.get("SELECT 1 FROM JobOffer WHERE id = ?",[application.job_id]);
+        if(!jobExist){
+            console.error("Job does not exist, application failed");
+            return;
+        }
+        // Ensure applied_at has a valid timestamp (default to current time if not provided)
+        const appliedAt = application.applied_at || new Date().toISOString();
+        const query = `INSERT INTO JobApplication (applied_at, cover_letter_url, resume_url, feedback, employer_id, candidate_id, job_id, status_id, location_id)
+        VALUES (?,?,?,?,?,?,?,?,?)`
+      
+        const values = [
+            appliedAt,
+            application.cover_letter_url,
+            application.resume_url,
+            application.feedback,
+            application.employer_id,
+            application.candidate_id,
+            application.job_id,
+            application.status_id,
+            application.location_id
+        ]
+        await db.run(query,values)
+        console.log(`Succesfully applied for the job`)
+    }catch(error){
+        console.error(`Cant apply for this job, try again`)
+    }
+}
+//Get all the existing appllications
+export async function getAllApplications() {
+    try {
+        const db = await getDB();
+        const query = `
+            SELECT  ja.id,
+        		ja.applied_at,
+        		ja.cover_letter_url,
+        		ja.resume_url,
+        		ja.feedback,
+                j.title AS job_title, 
+                e.company_name AS employer_name, 
+                u.name AS candidate_name, 
+                l.city AS location_city, 
+        		l.country,
+        		l.remote_type,
+                s.status_name 
+            FROM JobApplication ja
+            LEFT JOIN JobOffer j ON ja.job_id = j.id
+            LEFT JOIN Employer e ON ja.employer_id = e.id
+            LEFT JOIN Candidate c ON ja.candidate_id = c.id
+            LEFT JOIN User u on c.user_id = u.id
+            LEFT JOIN Location l ON ja.location_id = l.id
+            LEFT JOIN Status s ON ja.status_id = s.id
+        `;
+        const applications = await db.all(query);
+        if (!applications) {
+            console.log(`No experience found`);
+            return null;
+        }
+        return applications;
+    } catch (error) {
+        console.error("Error fetching job applications:", error.message);
+        return [];
+    }
+}
+//Get all the applications done by a single candidate
+export async function getApplicationsByCandidateID(candidate_id: number) {
+    try {
+        const db = await getDB();
+        const query = `
+            SELECT  ja.id,
+        		ja.applied_at,
+        		ja.cover_letter_url,
+        		ja.resume_url,
+        		ja.feedback,
+                j.title AS job_title, 
+                e.company_name AS employer_name, 
+                l.city AS location_city, 
+                s.status_name 
+            FROM JobApplication ja
+            JOIN JobOffer j ON ja.job_id = j.id
+            JOIN Employer e ON ja.employer_id = e.id
+            JOIN Location l ON ja.location_id = l.id
+            JOIN Status s ON ja.status_id = s.id
+            WHERE ja.candidate_id = ?
+        `;
+        const applications = await db.all(query, [candidate_id]);
+        if (!applications) {
+            console.log(`No applications found with ID: ${candidate_id}`);
+            return null;
+        }
+        return applications;
+    } catch (error) {
+        console.error(`Error fetching applications for candidate ${candidate_id}:`, error.message);
+        return [];
+    }
+}
+//Get all the candidates that have applied for a specific company
+export async function getApplicationsByCompany(employer_id: number) {
+    try {
+        const db = await getDB();
+        const query = `
+            SELECT ja.id,
+        		ja.applied_at,
+        		ja.cover_letter_url,
+        		ja.resume_url,
+        		ja.feedback,
+                j.title AS job_title, 
+                u.name AS candidate_name, 
+                l.city AS location_city, 
+                s.status_name 
+            FROM JobApplication ja
+            JOIN JobOffer j ON ja.job_id = j.id
+            JOIN Candidate c ON ja.candidate_id = c.id
+            JOIN User u on c.user_id = u.id
+            JOIN Location l ON ja.location_id = l.id
+            JOIN Status s ON ja.status_id = s.id
+            WHERE ja.employer_id = ?
+        `;
+        const applications = await db.all(query, [employer_id]);
+        if (!applications) {
+            console.log(`No applications found with ID: ${employer_id}`);
+            return null;
+        }
+        return applications;
+    } catch (error) {
+        console.error(`Error fetching applications for company ${employer_id}:`, error.message);
+        return [];
+    }
+}
+//Get all the applications for a specific job
+export async function getApplicationsByJobID(job_id: number) {
+    try {
+        const db = await getDB();
+        const query = `
+            SELECT ja.id,
+        		ja.applied_at,
+        		ja.cover_letter_url,
+        		ja.resume_url,
+        		ja.feedback,
+                e.company_name AS employer_name, 
+                u.name AS candidate_name, 
+                l.city AS location_city, 
+                s.status_name 
+            FROM JobApplication ja
+            JOIN Employer e ON ja.employer_id = e.id
+            JOIN Candidate c ON ja.candidate_id = c.id
+            JOIN User u on c.user_id = u.id
+            JOIN Location l ON ja.location_id = l.id
+            JOIN Status s ON ja.status_id = s.id
+            WHERE ja.job_id = ?
+        `;
+        const applications = await db.all(query, [job_id]);
+        if (!applications) {
+            console.log(`No applications found with ID: ${job_id}`);
+            return null;
+        }
+        return applications;
+    } catch (error) {
+        console.error(`Error fetching applications for job ${job_id}:`, error.message);
+        return [];
+    }
+}
+//Delete/Withdrawn application
+export async function deleteApplicationByID(id:number): Promise<void> {
+    try{
+        const db = await getDB();
+        //Check if the aplication exist
+        const applicationExist = await db.get(`SELECT 1 FROM JobApplication WHERE id = ?`, [id]);
+        if(!applicationExist){
+            throw new Error(`aPPLICATION with id: ${id} does not exist`);
+        }
+        //IF the application exist, deleter the record
+        const query = `DELETE FROM JobApplication WHERE id = ?`;
+        const result  = await db.run(query, [id]);
+        if(result.changes === 0){
+            throw new Error(`Failed to delete the application with the id ${id}`);
+        }
+        console.log(`application deleted successfully`);
+    }catch(error){
+        console.error(`Error deleting the application`, (error as Error).message);
+        throw new Error(error.message);
+    }
+}
+//#endregion
+
+//#region CRUD JobBookmarks
+export async function createJobBookmark(jobBookmark:any){
+    try{
+        const db = await getDB();
+    //To save a job the job must exist
+    const jobExist = await db.get("SELECT 1 FROM JobOffer WHERE id = ?",[jobBookmark.job_id]);
+    if(!jobExist){
+        console.error("Job does not exist, job bookmark failed");
+        return;
+    }
+    // Ensure acreated_at has a valid timestamp (default to current time if not provided)
+    const created_at = jobBookmark.created_at || new Date().toISOString();
+    const query = `INSERT INTO JobBookmark (candidate_id, job_id, created_at) VALUES (?,?,?)`
+    const values = [
+        jobBookmark.candidate_id,
+        jobBookmark.job_id,
+        created_at
+    ]
+    //Run the query and pass the values
+    await db.run(query,values);
+    console.log("Succesfully saved the job");
+    }catch(error){
+        console.error("Cant apply for this job");
+    }
+}
+//get all the Job Bookmarks by a candidate ID
+//Ordered from the most recent to the oldest
+export async function getAllJobBookmarksByCandidateID(id: number){
+    try{
+        const db = await getDB();
+        //Mostly a resume, wont display all the information in the bookmark site, just a resume
+        //The timestamp is parsed to a Date so it's easier top read for the user
+        const query = `SELECT u.name,
+                        	jo.title,
+                        	jo.job_type,
+                        	jo.experience_level,
+                        	jo.salary,
+                        	l.country,
+                        	DATE(jb.created_at) AS bookmark_date
+                        FROM JobBookmark jb
+                        JOIN Candidate c on jb.candidate_id = c.id
+                        JOIN User u on c.user_id = u.id
+                        JOIN JobOffer jo on jb.job_id = jo.id  
+                        JOIN Location l on jo.location_id = l.id
+                        WHERE c.id = ?
+                        ORDER BY jb.created_at`;
+        const bookmark = await db.all(query, [id]);
+        if (!bookmark) {
+            console.log(`No bookmarks found for candidate with ID: ${id}`);
+            return null;
+        }
+        return bookmark;
+    } catch (error) {
+        console.error(`Error fetching bookmarks for candidate ${id}:`, error.message);
+        return [];
+    }
+}
+//Delete a Bookmark
+//When the user is no longer interested in the job, already applied, etc
+export async function deleteJobBookmarkByID(id: number): Promise<void> {
+    try {
+        const db = await getDB();
+        
+        // Check if the bookmark exists
+        const bookmarkExist = await db.get(`SELECT 1 FROM JobBookmark WHERE id = ?`, [id]);
+        if (!bookmarkExist) {
+            throw new Error(`Bookmark with id ${id} does not exist`);
+        }
+
+        // If the bookmark exists, delete the record
+        const query = `DELETE FROM JobBookmark WHERE id = ?`;
+        const result = await db.run(query, [id]);
+
+        if (!result || result.changes === 0) {
+            throw new Error(`Failed to delete the bookmark with id ${id}`);
+        }
+
+        console.log(`Bookmark with id ${id} deleted successfully`);
+    } catch (error) {
+        console.error(`Error deleting the bookmark:`, (error as Error).message);
+        throw new Error(error.message);
+    }
+}
+//#endregion
