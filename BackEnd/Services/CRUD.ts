@@ -2093,3 +2093,167 @@ export async function deleteEmployerIndustry(employerIndustry: {
 }
 
 //#endregion
+
+//#region CandidateLanguage CRUD
+//Add a Language to a candidate, we can add as many Languages as we need for each Candidate
+export async function createCandidateLanguage(candidateLanguage: any){
+    try{
+        const db = await getDB();
+        //To save, the candidate and the language
+        const langExist = await db.get("SELECT 1 FROM Language WHERE id = ?",[candidateLanguage.language_id]);
+        const candExist =  await db.get("SELECT 1 FROM Candidate WHERE id = ?",[candidateLanguage.candidate_id]);
+        if(!langExist){
+            console.error("Language does not exist, operation failed");
+            return;
+        }
+        if(!candExist){
+            console.error("Candidate does not exist, operation failed");
+            return;
+        }
+        const query =`INSERT INTO CandidateLanguage (language_id, candidate_id) VALUES (?,?)`;
+        //Defininf the values
+        const values = [
+            candidateLanguage.language_id,
+            candidateLanguage.candidate_id
+        ]
+        //Run the query and pass the values
+        await db.run(query,values);
+        console.log("Succesfully saved the Candidate Lamguage");
+    }catch(error){
+        console.error("Cant relate the lamguage to the candidate", error);
+    }
+}
+//Read operations:
+// Display all the languages that are related to 1 candidate
+export async function getCandidateLanguageByCandID(id: number){
+    try{
+        const db = await getDB();
+        //Check that the Candidate ID exist
+        const candExist = await db.get("SELECT 1 FROM Candidate WHERE id = ?", [id]);
+        if (!candExist) {
+            console.error(`Candidate with ID ${id} does not exist.`);
+            return null; // Return null or throw an error
+        }
+        //Note that the Join to the User table is required to get the name for the candidate
+        const query =`SELECT 
+                         u.name,
+                         COALESCE(GROUP_CONCAT(l.language, ', '), 'No languages assigned') AS languages
+                    FROM Candidate c
+                    LEFT JOIN CandidateLanguage cl ON cl.candidate_id = c.id
+                    LEFT JOIN Language l ON cl.language_id = l.id
+					LEFT JOIN User u ON c.user_id = u.id
+                    WHERE c.id = ?`;
+        const candLang = await db.get(query, [id]);
+        //Check if the query executes with no errors
+        if(!candLang){
+            console.log(`Candidate with id ${id} was not found`);
+            return null;
+        }
+        return candLang;
+    }catch(error){
+        console.error(`Error fetching the CandidatelANGUAGE ${id}:`,error.message);
+        return[];
+    }
+}
+//Display de Candidates that are related to 1 Language
+export async function getCandidateLanguageByLangID(id: number){
+    try{
+        const db = await getDB();
+        //Check the Language ID exist
+        const langExist = await db.get("SELECT 1 FROM Language WHERE id = ?", [id]);
+        if (!langExist) {
+            console.error(`Language with ID ${id} does not exist.`);
+            return null; // Return null or throw an error
+        }
+        //As in the previous function, here the Join to the user table is also needed to get the candidate name
+        const query =`SELECT 
+                         l.language,
+                         COALESCE(GROUP_CONCAT(u.name, ', '), 'No candidates assigned') AS candidates
+                    FROM Language l
+                    LEFT JOIN CandidateLanguage cl ON cl.language_id = l.id
+                    LEFT JOIN Candidate c ON cl.candidate_id = c.id
+					LEFT JOIN User u ON c.user_id = u.id
+                    WHERE l.id = ?`;
+        const candLang = await db.get(query, [id]);
+        if(!candLang){
+            console.log(`Language with id ${id} was not found`);
+            return null;
+        }
+        return candLang;
+    }catch(error){
+        console.error(`Error fetching the candidates for language with ID ${id}:`,error.message);
+        return{};
+    }
+}
+//Edit CandidateLanguage if there was a mistake
+export async function editCandidateLanguage(candidateLanguage: {
+    new_language_id: number;
+    new_candidate_id: number;
+    old_language_id: number;
+    old_candidate_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+
+        const query = `
+            UPDATE CandidateLanguage
+            SET language_id = ?, candidate_id = ?
+            WHERE language_id = ? AND candidate_id = ?
+        `;
+
+        const values = [
+            candidateLanguage.new_language_id,
+            candidateLanguage.new_candidate_id,
+            candidateLanguage.old_language_id,
+            candidateLanguage.old_candidate_id
+        ];
+        // Getting the result after running the query and passing the values
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to update.");
+            return null;
+        }
+
+        console.log("Successfully updated the CandidateLanguage record.");
+        return result;
+    } catch (error) {
+        console.error("Error updating the CandidateLanguage record:", error);
+        return null;
+    }
+}
+//Delete relatinship between industry and employer
+export async function deleteCandidateLanguage(candidateLanguage: {
+    language_id: number;
+    candidate_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+        //Only delete if the language and candidate ID match with an existing record
+        const query = `
+            DELETE FROM CandidateLanguage
+            WHERE language_id = ? AND candidate_id = ?
+        `;
+
+        const values = [
+            candidateLanguage.language_id,
+            candidateLanguage.candidate_id
+        ];
+
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to delete.");
+            return null;
+        }
+
+        console.log("Successfully deleted the CandidateLanguage record.");
+        return result;
+    } catch (error) {
+        console.error("Error deleting the CandidateLanguage record:", error);
+        return null;
+    }
+}
+//#endregion
+
+
