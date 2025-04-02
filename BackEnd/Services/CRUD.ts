@@ -1936,3 +1936,160 @@ export async function deleteJobBookmarkByID(id: number): Promise<void> {
     }
 }
 //#endregion
+
+//#region CRUD EmployerIndustry
+//Add an Industry to an employer, we can add as many Industries as we need for each Employer
+export async function createEmployerIndustry(employerIndustry: any){
+    try{
+        const db = await getDB();
+        //To save, the employer and the industry must exist
+        const indExist =  await db.get("SELECT 1 FROM Industry WHERE id = ?",[employerIndustry.industry_id]);
+        const empExist = await db.get("SELECT 1 FROM Employer WHERE id = ?",[employerIndustry.employer_id]);
+        if(!indExist){
+            console.error("Industry does not exist, operation failed");
+            return;
+        }
+        if(!empExist){
+            console.error("Employer does not exist, operation failed");
+            return;
+        }
+        const query =`INSERT INTO EmployerIndustry (industry_id, employer_id) VALUES (?,?)`;
+        //Passing the values
+        const values = [
+            employerIndustry.industry_id,
+            employerIndustry.employer_id
+        ]
+        //Run the query and pass the values
+        await db.run(query,values);
+        console.log("Succesfully saved the Employer Industry");
+    }catch(error){
+        console.error("Cant relate the Industry to the employer", error);
+    }
+}
+// The importan ones, READ operations
+// Display all the Industries that are part of an Employer
+export async function getEmployerIndustryByEmpID(id: number){
+    try{
+        const db = await getDB();
+        const empExists = await db.get("SELECT 1 FROM Employer WHERE id = ?", [id]);
+        if (!empExists) {
+            console.error(`Emplopyer with ID ${id} does not exist.`);
+            return null; // Return null or throw an error
+        }
+
+        const query =`SELECT 
+                        e.company_name,
+                         COALESCE(GROUP_CONCAT(i.industry_name, ', '), 'No industries assigned') AS industries
+                    FROM Employer e
+                    LEFT JOIN EmployerIndustry ei ON ei.employer_id = e.id
+                    LEFT JOIN Industry i ON ei.industry_id = i.id
+                    WHERE e.id = ?`;
+        const empInd = await db.get(query, [id]);
+        if(!empInd){
+            console.log(`Employer with id ${id} was not found`);
+            return null;
+        }
+        return empInd;
+    }catch(error){
+        console.error(`Error fetching the EmployerIndustries ${id}:`,error.message);
+        return[];
+    }
+}
+export async function getEmployerIndustryByIndID(id: number){
+    try{
+        const db = await getDB();
+        const industryExists = await db.get("SELECT 1 FROM Industry WHERE id = ?", [id]);
+        if (!industryExists) {
+            console.error(`Industry with ID ${id} does not exist.`);
+            return null; // Return null or throw an error
+        }
+
+        const query =`SELECT 
+                        i.industry_name,
+                    	COALESCE(GROUP_CONCAT(e.company_name, ', '), 'No employers assigned') AS employers
+                    FROM Industry i 
+                    LEFT JOIN EmployerIndustry ei ON ei.industry_id = i.id
+                    LEFT JOIN Employer e ON ei.employer_id = e.id
+                    WHERE i.id = ?`;
+        const empInd = await db.get(query, [id]);
+        if(!empInd){
+            console.log(`Industry with id ${id} was not found`);
+            return null;
+        }
+        return empInd;
+    }catch(error){
+        console.error(`Error fetching the employers for industry with ID ${id}:`,error.message);
+        return{};
+    }
+}
+//Edit the record if there was a mistake
+export async function editEmployerIndustry(employerIndustry: {
+    new_industry_id: number;
+    new_employer_id: number;
+    old_industry_id: number;
+    old_employer_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+
+        const query = `
+            UPDATE EmployerIndustry
+            SET industry_id = ?, employer_id = ?
+            WHERE industry_id = ? AND employer_id = ?
+        `;
+
+        const values = [
+            employerIndustry.new_industry_id,
+            employerIndustry.new_employer_id,
+            employerIndustry.old_industry_id,
+            employerIndustry.old_employer_id
+        ];
+
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to update.");
+            return null;
+        }
+
+        console.log("Successfully updated the EmployerIndustry record.");
+        return result;
+    } catch (error) {
+        console.error("Error updating the EmployerIndustry record:", error);
+        return null;
+    }
+}
+//Delete relatinship between industry and employer
+export async function deleteEmployerIndustry(employerIndustry: {
+    industry_id: number;
+    employer_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+        //Only delete if the industry aned employer ID match with an existing record
+        const query = `
+            DELETE FROM EmployerIndustry
+            WHERE industry_id = ? AND employer_id = ?
+        `;
+
+        const values = [
+            employerIndustry.industry_id,
+            employerIndustry.employer_id
+        ];
+
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to delete.");
+            return null;
+        }
+
+        console.log("Successfully deleted the EmployerIndustry record.");
+        return result;
+    } catch (error) {
+        console.error("Error deleting the EmployerIndustry record:", error);
+        return null;
+    }
+}
+
+//#endregion
