@@ -1476,7 +1476,7 @@ export async function deleteExperienceByID(id:number): Promise<void> {
 }
 //#endregion 
 
-//#region for JobOffer
+//#region for JobOffer CRUD
 export async function createJobOffer(jobOffer:any) {
     try{
         const db = await getDB();
@@ -1662,4 +1662,776 @@ export async function deleteJobOfferByID(id:number): Promise<void> {
 }
 }
 //#endregion
+
+//#region JobApplications CRUD
+export async function  createJobApplication(application: any){
+    try{
+        const db = await getDB();
+        //To applicate for a job we need to make sure the job exist
+        const jobExist = await db.get("SELECT 1 FROM JobOffer WHERE id = ?",[application.job_id]);
+        if(!jobExist){
+            console.error("Job does not exist, application failed");
+            return;
+        }
+        // Ensure applied_at has a valid timestamp (default to current time if not provided)
+        const appliedAt = application.applied_at || new Date().toISOString();
+        const query = `INSERT INTO JobApplication (applied_at, cover_letter_url, resume_url, feedback, employer_id, candidate_id, job_id, status_id, location_id)
+        VALUES (?,?,?,?,?,?,?,?,?)`
+      
+        const values = [
+            appliedAt,
+            application.cover_letter_url,
+            application.resume_url,
+            application.feedback,
+            application.employer_id,
+            application.candidate_id,
+            application.job_id,
+            application.status_id,
+            application.location_id
+        ]
+        await db.run(query,values)
+        console.log(`Succesfully applied for the job`)
+    }catch(error){
+        console.error(`Cant apply for this job, try again`)
+    }
+}
+//Get all the existing appllications
+export async function getAllApplications() {
+    try {
+        const db = await getDB();
+        const query = `
+            SELECT  ja.id,
+        		ja.applied_at,
+        		ja.cover_letter_url,
+        		ja.resume_url,
+        		ja.feedback,
+                j.title AS job_title, 
+                e.company_name AS employer_name, 
+                u.name AS candidate_name, 
+                l.city AS location_city, 
+        		l.country,
+        		l.remote_type,
+                s.status_name 
+            FROM JobApplication ja
+            LEFT JOIN JobOffer j ON ja.job_id = j.id
+            LEFT JOIN Employer e ON ja.employer_id = e.id
+            LEFT JOIN Candidate c ON ja.candidate_id = c.id
+            LEFT JOIN User u on c.user_id = u.id
+            LEFT JOIN Location l ON ja.location_id = l.id
+            LEFT JOIN Status s ON ja.status_id = s.id
+        `;
+        const applications = await db.all(query);
+        if (!applications) {
+            console.log(`No experience found`);
+            return null;
+        }
+        return applications;
+    } catch (error) {
+        console.error("Error fetching job applications:", error.message);
+        return [];
+    }
+}
+//Get all the applications done by a single candidate
+export async function getApplicationsByCandidateID(candidate_id: number) {
+    try {
+        const db = await getDB();
+        const query = `
+            SELECT  ja.id,
+        		ja.applied_at,
+        		ja.cover_letter_url,
+        		ja.resume_url,
+        		ja.feedback,
+                j.title AS job_title, 
+                e.company_name AS employer_name, 
+                l.city AS location_city, 
+                s.status_name 
+            FROM JobApplication ja
+            JOIN JobOffer j ON ja.job_id = j.id
+            JOIN Employer e ON ja.employer_id = e.id
+            JOIN Location l ON ja.location_id = l.id
+            JOIN Status s ON ja.status_id = s.id
+            WHERE ja.candidate_id = ?
+        `;
+        const applications = await db.all(query, [candidate_id]);
+        if (!applications) {
+            console.log(`No applications found with ID: ${candidate_id}`);
+            return null;
+        }
+        return applications;
+    } catch (error) {
+        console.error(`Error fetching applications for candidate ${candidate_id}:`, error.message);
+        return [];
+    }
+}
+//Get all the candidates that have applied for a specific company
+export async function getApplicationsByCompany(employer_id: number) {
+    try {
+        const db = await getDB();
+        const query = `
+            SELECT ja.id,
+        		ja.applied_at,
+        		ja.cover_letter_url,
+        		ja.resume_url,
+        		ja.feedback,
+                j.title AS job_title, 
+                u.name AS candidate_name, 
+                l.city AS location_city, 
+                s.status_name 
+            FROM JobApplication ja
+            JOIN JobOffer j ON ja.job_id = j.id
+            JOIN Candidate c ON ja.candidate_id = c.id
+            JOIN User u on c.user_id = u.id
+            JOIN Location l ON ja.location_id = l.id
+            JOIN Status s ON ja.status_id = s.id
+            WHERE ja.employer_id = ?
+        `;
+        const applications = await db.all(query, [employer_id]);
+        if (!applications) {
+            console.log(`No applications found with ID: ${employer_id}`);
+            return null;
+        }
+        return applications;
+    } catch (error) {
+        console.error(`Error fetching applications for company ${employer_id}:`, error.message);
+        return [];
+    }
+}
+//Get all the applications for a specific job
+export async function getApplicationsByJobID(job_id: number) {
+    try {
+        const db = await getDB();
+        const query = `
+            SELECT ja.id,
+        		ja.applied_at,
+        		ja.cover_letter_url,
+        		ja.resume_url,
+        		ja.feedback,
+                e.company_name AS employer_name, 
+                u.name AS candidate_name, 
+                l.city AS location_city, 
+                s.status_name 
+            FROM JobApplication ja
+            JOIN Employer e ON ja.employer_id = e.id
+            JOIN Candidate c ON ja.candidate_id = c.id
+            JOIN User u on c.user_id = u.id
+            JOIN Location l ON ja.location_id = l.id
+            JOIN Status s ON ja.status_id = s.id
+            WHERE ja.job_id = ?
+        `;
+        const applications = await db.all(query, [job_id]);
+        if (!applications) {
+            console.log(`No applications found with ID: ${job_id}`);
+            return null;
+        }
+        return applications;
+    } catch (error) {
+        console.error(`Error fetching applications for job ${job_id}:`, error.message);
+        return [];
+    }
+}
+//Delete/Withdrawn application
+export async function deleteApplicationByID(id:number): Promise<void> {
+    try{
+        const db = await getDB();
+        //Check if the aplication exist
+        const applicationExist = await db.get(`SELECT 1 FROM JobApplication WHERE id = ?`, [id]);
+        if(!applicationExist){
+            throw new Error(`aPPLICATION with id: ${id} does not exist`);
+        }
+        //IF the application exist, deleter the record
+        const query = `DELETE FROM JobApplication WHERE id = ?`;
+        const result  = await db.run(query, [id]);
+        if(result.changes === 0){
+            throw new Error(`Failed to delete the application with the id ${id}`);
+        }
+        console.log(`application deleted successfully`);
+    }catch(error){
+        console.error(`Error deleting the application`, (error as Error).message);
+        throw new Error(error.message);
+    }
+}
+//#endregion
+
+//#region CRUD JobBookmarks
+export async function createJobBookmark(jobBookmark:any){
+    try{
+        const db = await getDB();
+    //To save a job the job must exist
+    const jobExist = await db.get("SELECT 1 FROM JobOffer WHERE id = ?",[jobBookmark.job_id]);
+    if(!jobExist){
+        console.error("Job does not exist, job bookmark failed");
+        return;
+    }
+    // Ensure acreated_at has a valid timestamp (default to current time if not provided)
+    const created_at = jobBookmark.created_at || new Date().toISOString();
+    const query = `INSERT INTO JobBookmark (candidate_id, job_id, created_at) VALUES (?,?,?)`
+    const values = [
+        jobBookmark.candidate_id,
+        jobBookmark.job_id,
+        created_at
+    ]
+    //Run the query and pass the values
+    await db.run(query,values);
+    console.log("Succesfully saved the job");
+    }catch(error){
+        console.error("Cant apply for this job");
+    }
+}
+//get all the Job Bookmarks by a candidate ID
+//Ordered from the most recent to the oldest
+export async function getAllJobBookmarksByCandidateID(id: number){
+    try{
+        const db = await getDB();
+        //Mostly a resume, wont display all the information in the bookmark site, just a resume
+        //The timestamp is parsed to a Date so it's easier top read for the user
+        const query = `SELECT u.name,
+                        	jo.title,
+                        	jo.job_type,
+                        	jo.experience_level,
+                        	jo.salary,
+                        	l.country,
+                        	DATE(jb.created_at) AS bookmark_date
+                        FROM JobBookmark jb
+                        JOIN Candidate c on jb.candidate_id = c.id
+                        JOIN User u on c.user_id = u.id
+                        JOIN JobOffer jo on jb.job_id = jo.id  
+                        JOIN Location l on jo.location_id = l.id
+                        WHERE c.id = ?
+                        ORDER BY jb.created_at`;
+        const bookmark = await db.all(query, [id]);
+        if (!bookmark) {
+            console.log(`No bookmarks found for candidate with ID: ${id}`);
+            return null;
+        }
+        return bookmark;
+    } catch (error) {
+        console.error(`Error fetching bookmarks for candidate ${id}:`, error.message);
+        return [];
+    }
+}
+//Delete a Bookmark
+//When the user is no longer interested in the job, already applied, etc
+export async function deleteJobBookmarkByID(id: number): Promise<void> {
+    try {
+        const db = await getDB();
+        
+        // Check if the bookmark exists
+        const bookmarkExist = await db.get(`SELECT 1 FROM JobBookmark WHERE id = ?`, [id]);
+        if (!bookmarkExist) {
+            throw new Error(`Bookmark with id ${id} does not exist`);
+        }
+
+        // If the bookmark exists, delete the record
+        const query = `DELETE FROM JobBookmark WHERE id = ?`;
+        const result = await db.run(query, [id]);
+
+        if (!result || result.changes === 0) {
+            throw new Error(`Failed to delete the bookmark with id ${id}`);
+        }
+
+        console.log(`Bookmark with id ${id} deleted successfully`);
+    } catch (error) {
+        console.error(`Error deleting the bookmark:`, (error as Error).message);
+        throw new Error(error.message);
+    }
+}
+//#endregion
+
+//#region CRUD EmployerIndustry
+//Add an Industry to an employer, we can add as many Industries as we need for each Employer
+export async function createEmployerIndustry(employerIndustry: any){
+    try{
+        const db = await getDB();
+        //To save, the employer and the industry must exist
+        const indExist =  await db.get("SELECT 1 FROM Industry WHERE id = ?",[employerIndustry.industry_id]);
+        const empExist = await db.get("SELECT 1 FROM Employer WHERE id = ?",[employerIndustry.employer_id]);
+        if(!indExist){
+            console.error("Industry does not exist, operation failed");
+            return;
+        }
+        if(!empExist){
+            console.error("Employer does not exist, operation failed");
+            return;
+        }
+        const query =`INSERT INTO EmployerIndustry (industry_id, employer_id) VALUES (?,?)`;
+        //Passing the values
+        const values = [
+            employerIndustry.industry_id,
+            employerIndustry.employer_id
+        ]
+        //Run the query and pass the values
+        await db.run(query,values);
+        console.log("Succesfully saved the Employer Industry");
+    }catch(error){
+        console.error("Cant relate the Industry to the employer", error);
+    }
+}
+// The importan ones, READ operations
+// Display all the Industries that are part of an Employer
+export async function getEmployerIndustryByEmpID(id: number){
+    try{
+        const db = await getDB();
+        const empExists = await db.get("SELECT 1 FROM Employer WHERE id = ?", [id]);
+        if (!empExists) {
+            console.error(`Emplopyer with ID ${id} does not exist.`);
+            return null; // Return null or throw an error
+        }
+
+        const query =`SELECT 
+                        e.company_name,
+                         COALESCE(GROUP_CONCAT(i.industry_name, ', '), 'No industries assigned') AS industries
+                    FROM Employer e
+                    LEFT JOIN EmployerIndustry ei ON ei.employer_id = e.id
+                    LEFT JOIN Industry i ON ei.industry_id = i.id
+                    WHERE e.id = ?`;
+        const empInd = await db.get(query, [id]);
+        if(!empInd){
+            console.log(`Employer with id ${id} was not found`);
+            return null;
+        }
+        return empInd;
+    }catch(error){
+        console.error(`Error fetching the EmployerIndustries ${id}:`,error.message);
+        return[];
+    }
+}
+export async function getEmployerIndustryByIndID(id: number){
+    try{
+        const db = await getDB();
+        const industryExists = await db.get("SELECT 1 FROM Industry WHERE id = ?", [id]);
+        if (!industryExists) {
+            console.error(`Industry with ID ${id} does not exist.`);
+            return null; // Return null or throw an error
+        }
+
+        const query =`SELECT 
+                        i.industry_name,
+                    	COALESCE(GROUP_CONCAT(e.company_name, ', '), 'No employers assigned') AS employers
+                    FROM Industry i 
+                    LEFT JOIN EmployerIndustry ei ON ei.industry_id = i.id
+                    LEFT JOIN Employer e ON ei.employer_id = e.id
+                    WHERE i.id = ?`;
+        const empInd = await db.get(query, [id]);
+        if(!empInd){
+            console.log(`Industry with id ${id} was not found`);
+            return null;
+        }
+        return empInd;
+    }catch(error){
+        console.error(`Error fetching the employers for industry with ID ${id}:`,error.message);
+        return{};
+    }
+}
+//Edit the record if there was a mistake
+export async function editEmployerIndustry(employerIndustry: {
+    new_industry_id: number;
+    new_employer_id: number;
+    old_industry_id: number;
+    old_employer_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+
+        const query = `
+            UPDATE EmployerIndustry
+            SET industry_id = ?, employer_id = ?
+            WHERE industry_id = ? AND employer_id = ?
+        `;
+
+        const values = [
+            employerIndustry.new_industry_id,
+            employerIndustry.new_employer_id,
+            employerIndustry.old_industry_id,
+            employerIndustry.old_employer_id
+        ];
+
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to update.");
+            return null;
+        }
+
+        console.log("Successfully updated the EmployerIndustry record.");
+        return result;
+    } catch (error) {
+        console.error("Error updating the EmployerIndustry record:", error);
+        return null;
+    }
+}
+//Delete relatinship between industry and employer
+export async function deleteEmployerIndustry(employerIndustry: {
+    industry_id: number;
+    employer_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+        //Only delete if the industry aned employer ID match with an existing record
+        const query = `
+            DELETE FROM EmployerIndustry
+            WHERE industry_id = ? AND employer_id = ?
+        `;
+
+        const values = [
+            employerIndustry.industry_id,
+            employerIndustry.employer_id
+        ];
+
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to delete.");
+            return null;
+        }
+
+        console.log("Successfully deleted the EmployerIndustry record.");
+        return result;
+    } catch (error) {
+        console.error("Error deleting the EmployerIndustry record:", error);
+        return null;
+    }
+}
+
+//#endregion
+
+//#region CandidateLanguage CRUD
+//Add a Language to a candidate, we can add as many Languages as we need for each Candidate
+export async function createCandidateLanguage(candidateLanguage: any){
+    try{
+        const db = await getDB();
+        //To save, the candidate and the language
+        const langExist = await db.get("SELECT 1 FROM Language WHERE id = ?",[candidateLanguage.language_id]);
+        const candExist =  await db.get("SELECT 1 FROM Candidate WHERE id = ?",[candidateLanguage.candidate_id]);
+        if(!langExist){
+            console.error("Language does not exist, operation failed");
+            return;
+        }
+        if(!candExist){
+            console.error("Candidate does not exist, operation failed");
+            return;
+        }
+        const query =`INSERT INTO CandidateLanguage (language_id, candidate_id) VALUES (?,?)`;
+        //Defininf the values
+        const values = [
+            candidateLanguage.language_id,
+            candidateLanguage.candidate_id
+        ]
+        //Run the query and pass the values
+        await db.run(query,values);
+        console.log("Succesfully saved the Candidate Lamguage");
+    }catch(error){
+        console.error("Cant relate the lamguage to the candidate", error);
+    }
+}
+//Read operations:
+// Display all the languages that are related to 1 candidate
+export async function getCandidateLanguageByCandID(id: number){
+    try{
+        const db = await getDB();
+        //Check that the Candidate ID exist
+        const candExist = await db.get("SELECT 1 FROM Candidate WHERE id = ?", [id]);
+        if (!candExist) {
+            console.error(`Candidate with ID ${id} does not exist.`);
+            return null; // Return null or throw an error
+        }
+        //Note that the Join to the User table is required to get the name for the candidate
+        const query =`SELECT 
+                         u.name,
+                         COALESCE(GROUP_CONCAT(l.language, ', '), 'No languages assigned') AS languages
+                    FROM Candidate c
+                    LEFT JOIN CandidateLanguage cl ON cl.candidate_id = c.id
+                    LEFT JOIN Language l ON cl.language_id = l.id
+					LEFT JOIN User u ON c.user_id = u.id
+                    WHERE c.id = ?`;
+        const candLang = await db.get(query, [id]);
+        //Check if the query executes with no errors
+        if(!candLang){
+            console.log(`Candidate with id ${id} was not found`);
+            return null;
+        }
+        return candLang;
+    }catch(error){
+        console.error(`Error fetching the CandidatelANGUAGE ${id}:`,error.message);
+        return[];
+    }
+}
+//Display de Candidates that are related to 1 Language
+export async function getCandidateLanguageByLangID(id: number){
+    try{
+        const db = await getDB();
+        //Check the Language ID exist
+        const langExist = await db.get("SELECT 1 FROM Language WHERE id = ?", [id]);
+        if (!langExist) {
+            console.error(`Language with ID ${id} does not exist.`);
+            return null; // Return null or throw an error
+        }
+        //As in the previous function, here the Join to the user table is also needed to get the candidate name
+        const query =`SELECT 
+                         l.language,
+                         COALESCE(GROUP_CONCAT(u.name, ', '), 'No candidates assigned') AS candidates
+                    FROM Language l
+                    LEFT JOIN CandidateLanguage cl ON cl.language_id = l.id
+                    LEFT JOIN Candidate c ON cl.candidate_id = c.id
+					LEFT JOIN User u ON c.user_id = u.id
+                    WHERE l.id = ?`;
+        const candLang = await db.get(query, [id]);
+        if(!candLang){
+            console.log(`Language with id ${id} was not found`);
+            return null;
+        }
+        return candLang;
+    }catch(error){
+        console.error(`Error fetching the candidates for language with ID ${id}:`,error.message);
+        return{};
+    }
+}
+//Edit CandidateLanguage if there was a mistake
+export async function editCandidateLanguage(candidateLanguage: {
+    new_language_id: number;
+    new_candidate_id: number;
+    old_language_id: number;
+    old_candidate_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+
+        const query = `
+            UPDATE CandidateLanguage
+            SET language_id = ?, candidate_id = ?
+            WHERE language_id = ? AND candidate_id = ?
+        `;
+
+        const values = [
+            candidateLanguage.new_language_id,
+            candidateLanguage.new_candidate_id,
+            candidateLanguage.old_language_id,
+            candidateLanguage.old_candidate_id
+        ];
+        // Getting the result after running the query and passing the values
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to update.");
+            return null;
+        }
+
+        console.log("Successfully updated the CandidateLanguage record.");
+        return result;
+    } catch (error) {
+        console.error("Error updating the CandidateLanguage record:", error);
+        return null;
+    }
+}
+//Delete relatinship between industry and employer
+export async function deleteCandidateLanguage(candidateLanguage: {
+    language_id: number;
+    candidate_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+        //Only delete if the language and candidate ID match with an existing record
+        const query = `
+            DELETE FROM CandidateLanguage
+            WHERE language_id = ? AND candidate_id = ?
+        `;
+
+        const values = [
+            candidateLanguage.language_id,
+            candidateLanguage.candidate_id
+        ];
+
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to delete.");
+            return null;
+        }
+
+        console.log("Successfully deleted the CandidateLanguage record.");
+        return result;
+    } catch (error) {
+        console.error("Error deleting the CandidateLanguage record:", error);
+        return null;
+    }
+}
+//#endregion
+
+//#region CRUD for JobOfferDisability
+export async function createJobOfferDisability(jobOfferDisability: any){
+    try{
+        const db = await getDB();
+        //To save, the job offer and the disability type must exist
+        const offerExist = await db.get("SELECT 1 FROM JobOffer WHERE id = ?",[jobOfferDisability.job_offer_id]);
+        const disExist =  await db.get("SELECT 1 FROM Disability WHERE id = ?",[jobOfferDisability.disability_id]);
+        if(!offerExist){
+            console.error("Offer does not exist, operation failed");
+            return;
+        }
+        if(!disExist){
+            console.error("Disability type does not exist, operation failed");
+            return;
+        }
+        const query =`INSERT INTO JobOfferDisability (job_offer_id, disability_id) VALUES (?,?)`;
+        //Definine the values
+        const values = [
+            jobOfferDisability.job_offer_id,
+            jobOfferDisability.disability_id
+        ]
+        //Run the query and pass the values
+        await db.run(query,values);
+        console.log("Succesfully saved the Job Offer Disability");
+    }catch(error){
+        console.error("Cant relate the disability to the offer", error);
+    }
+}
+//Read operations:
+// Display all the disabilities that are related to 1 offer
+export async function getJobOfferDisabilityByOfferID(id: number){
+    try{
+        const db = await getDB();
+        //Check that the Offer ID exist
+        const offerExist = await db.get("SELECT 1 FROM JobOffer WHERE id = ?", [id]);
+        if (!offerExist) {
+            console.error(`Offer with ID ${id} does not exist.`);
+            return null; // Return null or throw an error
+        }
+        //Note that the Join to the AssitanceDevice table is required to get the name for the asistance device
+        const query =`SELECT 
+                         jo.title,
+						 jo.job_type,
+						 jo.job_duration,
+                         COALESCE(GROUP_CONCAT(d.disability_type, ', '), 'No disabilities assigned') AS disabilities,
+						 COALESCE(GROUP_CONCAT(ad.device_name, ', '), 'No asistance device assigned') AS asistanceDevices
+                    FROM JobOffer jo
+                    LEFT JOIN JobOfferDisability jod ON jod.job_offer_id = jo.id
+                    LEFT JOIN Disability d ON jod.disability_id = d.id
+					LEFT JOIN AssistanceDevice ad ON d.assistance_device_id = ad.id
+                    WHERE jo.id = ?`;
+        const offDisa = await db.get(query, [id]);
+        //Check if the query executes with no errors
+        if(!offDisa){
+            console.log(`Offer with id ${id} was not found`);
+            return null;
+        }
+        return offDisa;
+    }catch(error){
+        console.error(`Error fetching the JobOfferDisability ${id}:`,error.message);
+        return[];
+    }
+}
+//Display de offers that are related to 1 disability
+export async function getJobOfferDisabilityByDisabilityID(id: number){
+    try{
+        const db = await getDB();
+        //Check the Disability ID exist
+        const disabilityExist = await db.get("SELECT 1 FROM Disability WHERE id = ?", [id]);
+        if (!disabilityExist) {
+            console.error(`Disability with ID ${id} does not exist.`);
+            return null; // Return null or throw an error
+        }
+        //As in the previous function, here the Join to the user table is also needed to get the asisatance device
+        const query =`SELECT 
+                         d.disability_type,
+						 ad.device_name,
+                         COALESCE(GROUP_CONCAT(jo.title, ', '), 'No offers assigned') AS offers
+                    FROM Disability d 
+					LEFT JOIN AssistanceDevice ad ON d.assistance_device_id = ad.id
+                    LEFT JOIN JobOfferDisability jod ON jod.disability_id = d.id
+                    LEFT JOIN JobOffer jo ON jod.job_offer_id = jo.id
+                    WHERE d.id = ?`;
+        const candLang = await db.get(query, [id]);
+        if(!candLang){
+            console.log(`Disability with id ${id} was not found`);
+            return null;
+        }
+        return candLang;
+    }catch(error){
+        console.error(`Error fetching the offers for disability with ID ${id}:`,error.message);
+        return{};
+    }
+}
+//Edit JobOfferDisability if there was a mistake
+export async function editJobOfferDisability(jobOfferDisability: {
+    new_job_offer_id: number;
+    new_disability_id: number;
+    old_job_offer_id: number;
+    old_disability_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+        //To save, the job offer and the disability type must exist
+        const offerExist = await db.get("SELECT 1 FROM JobOffer WHERE id = ?",[jobOfferDisability.new_job_offer_id]);
+        const disExist =  await db.get("SELECT 1 FROM Disability WHERE id = ?",[jobOfferDisability.new_disability_id]);
+        if(!offerExist){
+            console.error("Offer does not exist, operation failed");
+            return;
+        }
+        if(!disExist){
+            console.error("Disability type does not exist, operation failed");
+            return;
+        }
+        const query = `
+            UPDATE JobOfferDisability
+            SET job_offer_id = ?, disability_id  = ?
+            WHERE job_offer_id = ? AND disability_id = ?
+        `;
+
+        const values = [
+            jobOfferDisability.new_job_offer_id,
+            jobOfferDisability.new_disability_id,
+            jobOfferDisability.old_job_offer_id,
+            jobOfferDisability.old_disability_id
+        ];
+        // Getting the result after running the query and passing the values
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to update.");
+            return null;
+        }
+
+        console.log("Successfully updated the jobOfferDisability record.");
+        return result;
+    } catch (error) {
+        console.error("Error updating the jobOfferDisability record:", error);
+        return null;
+    }
+}
+//Delete relatinship between industry and employer
+export async function deleteJobOfferDisability(jobOfferDisability: {
+    job_offer_id: number;
+    disability_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+        //Only delete if the language and candidate ID match with an existing record
+        const query = `
+            DELETE FROM JobOfferDisability
+            WHERE job_offer_id = ? AND disability_id = ?
+        `;
+
+        const values = [
+            jobOfferDisability.job_offer_id,
+            jobOfferDisability.disability_id
+        ];
+
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to delete.");
+            return null;
+        }
+
+        console.log("Successfully deleted the jobOfferDisability record.");
+        return result;
+    } catch (error) {
+        console.error("Error deleting the jobOfferDisability record:", error);
+        return null;
+    }
+}
+
+//#endregion
+
+
+
 
