@@ -2256,4 +2256,182 @@ export async function deleteCandidateLanguage(candidateLanguage: {
 }
 //#endregion
 
+//#region CRUD for JobOfferDisability
+export async function createJobOfferDisability(jobOfferDisability: any){
+    try{
+        const db = await getDB();
+        //To save, the job offer and the disability type must exist
+        const offerExist = await db.get("SELECT 1 FROM JobOffer WHERE id = ?",[jobOfferDisability.job_offer_id]);
+        const disExist =  await db.get("SELECT 1 FROM Disability WHERE id = ?",[jobOfferDisability.disability_id]);
+        if(!offerExist){
+            console.error("Offer does not exist, operation failed");
+            return;
+        }
+        if(!disExist){
+            console.error("Disability type does not exist, operation failed");
+            return;
+        }
+        const query =`INSERT INTO JobOfferDisability (job_offer_id, disability_id) VALUES (?,?)`;
+        //Definine the values
+        const values = [
+            jobOfferDisability.job_offer_id,
+            jobOfferDisability.disability_id
+        ]
+        //Run the query and pass the values
+        await db.run(query,values);
+        console.log("Succesfully saved the Job Offer Disability");
+    }catch(error){
+        console.error("Cant relate the disability to the offer", error);
+    }
+}
+//Read operations:
+// Display all the disabilities that are related to 1 offer
+export async function getJobOfferDisabilityByOfferID(id: number){
+    try{
+        const db = await getDB();
+        //Check that the Offer ID exist
+        const offerExist = await db.get("SELECT 1 FROM JobOffer WHERE id = ?", [id]);
+        if (!offerExist) {
+            console.error(`Offer with ID ${id} does not exist.`);
+            return null; // Return null or throw an error
+        }
+        //Note that the Join to the AssitanceDevice table is required to get the name for the asistance device
+        const query =`SELECT 
+                         jo.title,
+						 jo.job_type,
+						 jo.job_duration,
+                         COALESCE(GROUP_CONCAT(d.disability_type, ', '), 'No disabilities assigned') AS disabilities,
+						 COALESCE(GROUP_CONCAT(ad.device_name, ', '), 'No asistance device assigned') AS asistanceDevices
+                    FROM JobOffer jo
+                    LEFT JOIN JobOfferDisability jod ON jod.job_offer_id = jo.id
+                    LEFT JOIN Disability d ON jod.disability_id = d.id
+					LEFT JOIN AssistanceDevice ad ON d.assistance_device_id = ad.id
+                    WHERE jo.id = ?`;
+        const offDisa = await db.get(query, [id]);
+        //Check if the query executes with no errors
+        if(!offDisa){
+            console.log(`Offer with id ${id} was not found`);
+            return null;
+        }
+        return offDisa;
+    }catch(error){
+        console.error(`Error fetching the JobOfferDisability ${id}:`,error.message);
+        return[];
+    }
+}
+//Display de offers that are related to 1 disability
+export async function getJobOfferDisabilityByDisabilityID(id: number){
+    try{
+        const db = await getDB();
+        //Check the Disability ID exist
+        const disabilityExist = await db.get("SELECT 1 FROM Disability WHERE id = ?", [id]);
+        if (!disabilityExist) {
+            console.error(`Disability with ID ${id} does not exist.`);
+            return null; // Return null or throw an error
+        }
+        //As in the previous function, here the Join to the user table is also needed to get the asisatance device
+        const query =`SELECT 
+                         d.disability_type,
+						 ad.device_name,
+                         COALESCE(GROUP_CONCAT(jo.title, ', '), 'No offers assigned') AS offers
+                    FROM Disability d 
+					LEFT JOIN AssistanceDevice ad ON d.assistance_device_id = ad.id
+                    LEFT JOIN JobOfferDisability jod ON jod.disability_id = d.id
+                    LEFT JOIN JobOffer jo ON jod.job_offer_id = jo.id
+                    WHERE d.id = ?`;
+        const candLang = await db.get(query, [id]);
+        if(!candLang){
+            console.log(`Disability with id ${id} was not found`);
+            return null;
+        }
+        return candLang;
+    }catch(error){
+        console.error(`Error fetching the offers for disability with ID ${id}:`,error.message);
+        return{};
+    }
+}
+//Edit JobOfferDisability if there was a mistake
+export async function editJobOfferDisability(jobOfferDisability: {
+    new_job_offer_id: number;
+    new_disability_id: number;
+    old_job_offer_id: number;
+    old_disability_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+        //To save, the job offer and the disability type must exist
+        const offerExist = await db.get("SELECT 1 FROM JobOffer WHERE id = ?",[jobOfferDisability.new_job_offer_id]);
+        const disExist =  await db.get("SELECT 1 FROM Disability WHERE id = ?",[jobOfferDisability.new_disability_id]);
+        if(!offerExist){
+            console.error("Offer does not exist, operation failed");
+            return;
+        }
+        if(!disExist){
+            console.error("Disability type does not exist, operation failed");
+            return;
+        }
+        const query = `
+            UPDATE JobOfferDisability
+            SET job_offer_id = ?, disability_id  = ?
+            WHERE job_offer_id = ? AND disability_id = ?
+        `;
+
+        const values = [
+            jobOfferDisability.new_job_offer_id,
+            jobOfferDisability.new_disability_id,
+            jobOfferDisability.old_job_offer_id,
+            jobOfferDisability.old_disability_id
+        ];
+        // Getting the result after running the query and passing the values
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to update.");
+            return null;
+        }
+
+        console.log("Successfully updated the jobOfferDisability record.");
+        return result;
+    } catch (error) {
+        console.error("Error updating the jobOfferDisability record:", error);
+        return null;
+    }
+}
+//Delete relatinship between industry and employer
+export async function deleteJobOfferDisability(jobOfferDisability: {
+    job_offer_id: number;
+    disability_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+        //Only delete if the language and candidate ID match with an existing record
+        const query = `
+            DELETE FROM JobOfferDisability
+            WHERE job_offer_id = ? AND disability_id = ?
+        `;
+
+        const values = [
+            jobOfferDisability.job_offer_id,
+            jobOfferDisability.disability_id
+        ];
+
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to delete.");
+            return null;
+        }
+
+        console.log("Successfully deleted the jobOfferDisability record.");
+        return result;
+    } catch (error) {
+        console.error("Error deleting the jobOfferDisability record:", error);
+        return null;
+    }
+}
+
+//#endregion
+
+
+
 
