@@ -1621,7 +1621,7 @@ export async function editJobOfferByID(id:number, updates: Partial<{
 }>) {
     try{
         const db = await getDB();
-        const jobOfferExist =  await db.get(`SELECT * FROM Employer WHERE id = ?`, [id]);
+        const jobOfferExist =  await db.get(`SELECT * FROM JobOffer WHERE id = ?`, [id]);
         if(!jobOfferExist){
             console.error(`This job offer with id ${id} does not exist`);
             return;
@@ -1650,7 +1650,7 @@ export async function deleteJobOfferByID(id:number): Promise<void> {
         if(!userExist){
             throw new Error(`Job Offer with id: ${id} does not exist`);
         }
-        const query = `DELETE FROM Job Offer WHERE id = ?`;
+        const query = `DELETE FROM JobOffer WHERE id = ?`;
         const result  = await db.run(query, id);
         if(result.changes === 0){
             throw new Error(`Failed to delete the User with the id ${id}`);
