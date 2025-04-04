@@ -2431,7 +2431,195 @@ export async function deleteJobOfferDisability(jobOfferDisability: {
 }
 
 //#endregion
+//#region candidate Skill CRUD
+
+export async function AddSkillToCandidate(candidateSkill:any) {
+    try{
+        const db = await getDB();
+        //To save, the job offer and the disability type must exist
+        const candidateExist = await db.get("SELECT 1 FROM Candidate WHERE id = ?",[candidateSkill.candidate_id]);
+        const skillExist =  await db.get("SELECT 1 FROM Skill WHERE id = ?",[candidateSkill.skill_id]);
+        if(!candidateExist){
+            console.error("Candidate does not exist, operation failed");
+            return;
+        }
+        if(!skillExist){
+            console.error("Disability type does not exist, operation failed");
+            return;
+        }
+        const query =`INSERT INTO CandidateSkill (candidate_id, skill_id) VALUES (?,?)`;
+        //Definine the values
+        const values = [
+            candidateSkill.candidate_id,
+            candidateSkill.skill_id
+        ]
+        //Run the query and pass the values
+        await db.run(query,values);
+        console.log("Succesfully saved the Job Offer Disability");
+    }catch(error){
+        console.error("Cant relate the disability to the offer", error);
+    }
+}
+export async function getSkillByCandidateID(id: number){
+    try{
+        const db = await getDB();
+        const candidateExist = await db.get("SELECT 1 FROM Candidate WHERE id = ?", [id]);
+        if (!candidateExist) {
+            console.error(`Candidate with ID ${id} does not exist.`);
+            return null;
+        }
+        const query =`SELECT 
+                        u.name,
+                        u.country,
+                        u.email,
+                        u.phone,
+                        c.genre,
+                        COALESCE(GROUP_CONCAT(DISTINCT s.skill_name), 'No Skill assigned') AS skill_name,
+                        COALESCE(GROUP_CONCAT(DISTINCT s.skill_type), 'No Skill type assigned') AS skill_type
+                    FROM Candidate c
+                    LEFT JOIN CandidateSkill cs ON cs.candidate_id = c.id
+                    LEFT JOIN Skill s ON cs.skill_id = s.id
+                    LEFT JOIN User u ON c.user_id = u.id
+                    WHERE c.id = ?`;
+        const candidateSkills = await db.get(query, [id]);
+        if(!candidateSkills){
+            console.log(`candidate with id ${id} was not found`);
+            return null;
+        }
+        return candidateSkills;
+    }catch(error){
+        console.error(`Error fetching the Candidate skill ${id}:`,error.message);
+        return[];
+    }
+}
+export async function deleteSkillFromCandidate(CandidateSkill: {
+    candidate_id: number;
+    skill_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+        //Only delete if the language and candidate ID match with an existing record
+        const query = `
+            DELETE FROM CandidateSkill
+            WHERE candidate_id = ? AND skill_id = ?
+        `;
+
+        const values = [
+            CandidateSkill.candidate_id,
+            CandidateSkill.skill_id
+        ];
+
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to delete.");
+            return null;
+        }
+
+        console.log("Successfully deleted the CandidateSkill record.");
+        return result;
+    } catch (error) {
+        console.error("Error deleting the CandidateSkill record:", error);
+        return null;
+    }
+}
+//#endregion
 
 
+//#region 
+export async function addDisabilityToCandidate(candidateDisability:any) {
+    try{
+        const db = await getDB();
+        //To save, the job offer and the disability type must exist
+        const candidateExist = await db.get("SELECT id FROM Candidate WHERE id = ?",[candidateDisability.candidate_id]);
+        const disabilityExist =  await db.get("SELECT id FROM Disability WHERE id = ?",[candidateDisability.disability_id]);
+        if(!candidateExist){
+            console.error("Candidate does not exist, operation failed");
+            return;
+        }
+        if(!disabilityExist){
+            console.error("Disability type does not exist, operation failed");
+            return;
+        }
+        const query =`INSERT INTO CandidateDisability (candidate_id, disability_id) VALUES (?,?)`;
+        //Definine the values
+        const values = [
+            candidateDisability.candidate_id,
+            candidateDisability.disability_id
+        ]
+        //Run the query and pass the values
+        await db.run(query,values);
+        console.log("Succesfully saved the disability");
+    }catch(error){
+        console.error("Cant relate the disability to the candidate", error);
+    }
+}
 
+export async function getDisabilityForCandidateID(id: number){
+    try{
+        const db = await getDB();
+        const candidateExist = await db.get("SELECT 1 FROM Candidate WHERE id = ?", [id]);
+        if (!candidateExist) {
+            console.error(`Candidate with ID ${id} does not exist.`);
+            return null;
+        }
+        const query =`SELECT 
+                            u.name,
+                            u.country,
+                            u.email,
+                            u.phone,
+                            c.genre,
+                            COALESCE(GROUP_CONCAT(DISTINCT d.disability_type), 'No Disbility assigned') AS disability_type,
+                            COALESCE(GROUP_CONCAT(DISTINCT d.disability_rate), 'No Disability assigned') AS disability_rate
+                        FROM Candidate c
+                        LEFT JOIN CandidateDisability cd ON cd.candidate_id = c.id
+                        LEFT JOIN Disability d ON cd.disability_id = d.id
+                        LEFT JOIN User u ON c.user_id = u.id
+                        WHERE c.id = ?`;
+        const candidateDisability = await db.get(query, [id]);
+        if(!candidateDisability){
+            console.log(`candidate with id ${id} was not found`);
+            return null;
+        }
+        return candidateDisability;
+    }catch(error){
+        console.error(`Error fetching the Candidate disability ${id}:`,error.message);
+        return null;
+    }
+}
+export async function deleteDisabilityFromCandidat(candidateDisability: {
+    candidate_id: number;
+    disability_id: number;
+}): Promise<any> {
+    try {
+        const db = await getDB();
+        const query = `
+            DELETE FROM CandidateDisability 
+            WHERE candidate_id = ? AND skill_id = ?
+        `;
+
+        const values = [
+            candidateDisability.candidate_id,
+            candidateDisability.disability_id
+        ];
+
+        const result = await db.run(query, values);
+
+        if (result.changes === 0) {
+            console.log("No matching record found to delete.");
+            return null;
+        }
+
+        console.log("Successfully deleted the CandidateDisaability record.");
+        return result;
+    } catch (error) {
+        console.error("Error deleting the CandidateDisaability record:", error);
+        return null;
+    }
+}
+//#endregion
+
+//#region 
+
+//#endregion
 
