@@ -1,7 +1,4 @@
-import { promises } from "dns";
 import { getDB } from "../DB/Connection"    
-import { error } from "console";
-import { getgid } from "process";
 
 //#region CRUD for user table
 export async function createUser(user:any) {
