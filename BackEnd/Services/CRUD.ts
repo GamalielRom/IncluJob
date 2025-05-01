@@ -2621,5 +2621,74 @@ export async function deleteDisabilityFromCandidat(candidateDisability: {
 
 //#region 
 
+export async function addAssistanceDeviceToDisability(disabilityDevice: { disability_id: number, assistance_device_id: number }) {
+    try {
+        const db = await getDB();
+
+        const disabilityExists = await db.get("SELECT 1 FROM Disability WHERE id = ?", [disabilityDevice.disability_id]);
+        const deviceExists = await db.get("SELECT 1 FROM AssistanceDevice WHERE id = ?", [disabilityDevice.assistance_device_id]);
+
+        if (!disabilityExists) {
+            console.error("Disability not found.");
+            return;
+        }
+        if (!deviceExists) {
+            console.error("Assistance device not found.");
+            return;
+        }
+
+        const query = `INSERT INTO DisabilityDevice (disability_id, assistance_device_id) VALUES (?, ?)`;
+        await db.run(query, [disabilityDevice.disability_id, disabilityDevice.assistance_device_id]);
+
+        console.log("Assistance device successfully linked to disability.");
+    } catch (error) {
+        console.error("Error adding assistance device to disability:", error);
+    }
+}
+
+
+export async function getDevicesByDisabilityID(disability_id: number) {
+    try {
+        const db = await getDB();
+        const query = `
+            SELECT ad.id, ad.device_name
+            FROM DisabilityDevice dd
+            JOIN AssistanceDevice ad ON dd.assistance_device_id = ad.id
+            WHERE dd.disability_id = ?
+        `;
+        const devices = await db.all(query, [disability_id]);
+        return devices;
+    } catch (error) {
+        console.error("Error fetching devices for disability:", error.message);
+        return [];
+    }
+}
+
+export async function deleteDisabilityDeviceRelation(relation: {
+    disability_id: number;
+    assistance_device_id: number;
+}) {
+    try {
+        const db = await getDB();
+        const query = `
+            DELETE FROM DisabilityDevice
+            WHERE disability_id = ? AND assistance_device_id = ?
+        `;
+        const result = await db.run(query, [
+            relation.disability_id,
+            relation.assistance_device_id
+        ]);
+
+        if (result.changes === 0) {
+            console.log("No matching relation found.");
+        } else {
+            console.log("Relation deleted successfully.");
+        }
+    } catch (error) {
+        console.error("Error deleting relation:", error.message);
+    }
+}
+
+
 //#endregion
 

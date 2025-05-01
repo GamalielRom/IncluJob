@@ -1,9 +1,9 @@
-import { createJobOfferDisability, deleteJobOfferDisability, editJobOfferDisability, getJobOfferDisabilityByDisabilityID, getJobOfferDisabilityByOfferID } from "./CRUD";
+import {addAssistanceDeviceToDisability , getDevicesByDisabilityID, deleteDisabilityDeviceRelation } from "./CRUD";
 
 async function main() {
-   const candidate =  await deleteJobOfferDisability({job_offer_id:1, disability_id:6});
-   console.log(candidate);
-   return candidate
+   const Device =  await deleteDisabilityDeviceRelation({disability_id: 3, assistance_device_id: 3});
+   console.log(Device);
+   return Device
 }
 
 main();
